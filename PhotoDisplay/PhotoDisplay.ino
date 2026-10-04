@@ -65,7 +65,7 @@ static const char* PHOTO_PATH = "/photo.jpg";
 static const char* AP_PASSWORD = "photo1234";
 
 static constexpr uint32_t AP_IDLE_MS = 10UL * 60UL * 1000UL;
-static constexpr size_t MAX_PHOTO_BYTES = 8UL * 1024UL * 1024UL;
+static constexpr size_t MAX_PHOTO_BYTES = 4UL * 1024UL * 1024UL;
 
 String apSsid;
 bool apActive = false;
@@ -109,26 +109,53 @@ bool showStoredPhoto() {
   }
 
   const size_t photoSize = f.size();
-
   if (photoSize == 0 || photoSize > MAX_PHOTO_BYTES) {
+    f.close();
     drawNoPhotoScreen();
     textCenter("Invalid photo file", lcd.height() - 20, 1, TFT_RED);
     return false;
   }
 
+  // Copy the JPEG into PSRAM, then use LovyanGFX's raw-buffer JPEG API.
+  uint8_t* jpeg = (uint8_t*)ps_malloc(photoSize);
+  if (!jpeg) {
+    f.close();
+    drawNoPhotoScreen();
+    textCenter("Not enough PSRAM", lcd.height() - 20, 1, TFT_RED);
+    return false;
+  }
+
+  size_t got = 0;
+  while (got < photoSize) {
+    const size_t n = f.read(jpeg + got, photoSize - got);
+    if (n == 0) break;
+    got += n;
+  }
+  f.close();
+
+  if (got != photoSize) {
+    free(jpeg);
+    drawNoPhotoScreen();
+    textCenter("Photo read failed", lcd.height() - 20, 1, TFT_RED);
+    return false;
+  }
+
   lcd.fillScreen(TFT_BLACK);
 
-  // Use LovyanGFX's explicit File data wrapper for JPEG decoding.
-  f.seek(0);
-  lgfx::v1::DataWrapperT<fs::File> wrapper(&f);
   const bool ok = lcd.drawJpg(
-    &wrapper,
+    jpeg,
+    photoSize,
     0,
     0,
     lcd.width(),
-    lcd.height()
+    lcd.height(),
+    0,
+    0,
+    1.0f,
+    0.0f
   );
-  f.close();
+
+  free(jpeg);
 
   if (!ok) {
     drawNoPhotoScreen();
@@ -138,7 +165,6 @@ bool showStoredPhoto() {
 
   return true;
 }
-
 String pageHtml() {
   String s;
   s.reserve(9000);
@@ -345,18 +371,19 @@ void setupServer() {
   server.on("/status", HTTP_GET, []() {
     lastClientAt = millis();
 
-    String out = "{\\"ap\\":";
+    String out = "{";
+    out += "\"ap\":";
     out += apActive ? "true" : "false";
-    out += ",\\"photo\\":";
+    out += ",\"photo\":";
     out += FFat.exists(PHOTO_PATH) ? "true" : "false";
 
     if (FFat.exists(PHOTO_PATH)) {
       File f = FFat.open(PHOTO_PATH, FILE_READ);
-      out += ",\\"bytes\\":";
+      out += ",\"bytes\":";
       out += f ? String((unsigned)f.size()) : "0";
       if (f) f.close();
     } else {
-      out += ",\\"bytes\\":0";
+      out += ",\"bytes\":0";
     }
 
     out += "}";
@@ -391,10 +418,10 @@ void setup() {
 
   Serial.printf(
     "[BOOT] Flash=%u bytes PSRAM=%u bytes LCD=%dx%d\n",
-    ESP.getFlashChipSize(),
-    ESP.getPsramSize(),
-    lcd.width(),
-    lcd.height()
+    (unsigned long)ESP.getFlashChipSize(),
+    (unsigned long)ESP.getPsramSize(),
+    (int)lcd.width(),
+    (int)lcd.height()
   );
 
   if (!FFat.begin(true)) {
