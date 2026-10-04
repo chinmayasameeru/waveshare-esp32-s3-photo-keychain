@@ -1,54 +1,177 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Waveshare Photo Display Flasher</title>
-  <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
-  <style>
-    :root{color-scheme:dark}*{box-sizing:border-box}
-    body{margin:0;min-height:100vh;display:grid;place-items:center;padding:28px;
-      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#080b12;color:#edf2f7}
-    main{width:min(680px,100%);background:#151a23;border:1px solid #293342;border-radius:22px;padding:32px;
-      box-shadow:0 24px 80px rgba(0,0,0,.45)}
-    h1{margin:0 0 8px;font-size:30px}.sub{margin:0 0 24px;color:#aab5c5}
-    .pill{display:inline-block;padding:7px 10px;border-radius:999px;background:#232b38;color:#bac6d7;font-size:13px;margin:4px}
-    .box{background:#0e131b;border:1px solid #27303d;border-radius:16px;padding:18px;margin-top:22px}
-    ol{line-height:1.65;color:#c3cddd;padding-left:22px}.small{font-size:13px;color:#8e9bad;line-height:1.55}
-    esp-web-install-button{display:block;margin-top:20px}
-    esp-web-install-button button{appearance:none;border:0;border-radius:14px;padding:16px 20px;width:100%;
-      font-size:18px;font-weight:700;cursor:pointer;background:#f4f6f8;color:#111}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Waveshare Photo Display</title>
+<script src="https://unpkg.com/esptool-js/bundle.js"></script>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}
+body{margin:0;min-height:100vh;padding:24px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#080b12;color:#edf2f7}
+main{width:min(700px,100%);margin:auto;background:#151a23;border:1px solid #293342;border-radius:22px;padding:28px}
+h1{margin:0 0 8px}.sub{color:#aab5c5;line-height:1.5}
+.box{margin-top:18px;padding:18px;border:1px solid #293342;border-radius:16px;background:#0e131b}
+input[type=file]{width:100%;padding:12px;border-radius:12px;border:1px solid #394456;background:#161c26;color:#fff}
+button{width:100%;margin-top:14px;padding:15px;border:0;border-radius:13px;background:#f4f6f8;color:#111;font-size:17px;font-weight:700}
+button:disabled{opacity:.45}
+#preview{display:none;width:100%;max-width:320px;aspect-ratio:4/3;object-fit:cover;border-radius:12px;margin:14px auto 0;border:1px solid #293342}
+#status{margin-top:16px;white-space:pre-wrap;color:#b9c4d5;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;line-height:1.5}
+.note{color:#8f9aae;font-size:13px;line-height:1.55}
+</style>
 </head>
 <body>
 <main>
-  <h1>Waveshare Photo Display</h1>
-  <p class="sub">Direct browser flashing for the ESP32-S3-LCD-2 No-Touch board.</p>
-  <div>
-    <span class="pill">ESP32-S3R8</span>
-    <span class="pill">16 MB Flash</span>
-    <span class="pill">8 MB PSRAM</span>
-    <span class="pill">240×320 ST7789T3</span>
-  </div>
+<h1>Waveshare Photo Display</h1>
+<p class="sub">Select the image you want stored on the board. The browser converts it to a 320×240 JPEG and flashes it together with the firmware. The ESP32 itself uses no Wi-Fi.</p>
 
-  <esp-web-install-button manifest="manifest.json?v=0.1.1">
-    <button slot="activate">⚡ Flash Photo Display</button>
-    <span slot="unsupported">Use desktop Chrome or Edge for Web Serial.</span>
-    <span slot="not-allowed">This installer must be opened over HTTPS.</span>
-  </esp-web-install-button>
+<div class="box">
+<label for="photo"><b>Choose an image</b></label>
+<input id="photo" type="file" accept="image/*">
+<img id="preview" alt="Preview">
+<button id="flash" disabled>⚡ Flash Photo Display</button>
+<div id="status">Choose an image to enable flashing.</div>
+</div>
 
-  <div class="box">
-    <strong>After flashing</strong>
-    <ol>
-      <li>Let the board reboot.</li>
-      <li>On your iPhone, join the <b>PhotoDisplay-xxxxxx</b> Wi-Fi network.</li>
-      <li>Password: <b>photo1234</b></li>
-      <li>Open <b>http://192.168.4.1</b> in Safari.</li>
-      <li>Choose a JPEG and press <b>Show photo</b>.</li>
-    </ol>
-  </div>
-
-  <p class="small">The firmware stores the JPEG in FFat and displays it on the LCD. Wi-Fi times out after 10 minutes without browser activity.</p>
+<div class="box">
+<b>USB</b>
+<p class="note">Use desktop Chrome or Edge over HTTPS with the ESP32-S3 connected by USB. After flashing, unplug/replug the board; it will show the selected image automatically.</p>
+</div>
 </main>
+
+<script>
+const PHOTO_ADDR = 0x310000;
+const PHOTO_MAGIC = 0x544F4850;
+const TARGET_W = 320;
+const TARGET_H = 240;
+
+const input = document.getElementById('photo');
+const preview = document.getElementById('preview');
+const flashButton = document.getElementById('flash');
+const status = document.getElementById('status');
+
+function log(msg){ status.textContent = msg; }
+
+function loadImage(file){
+  return new Promise((resolve,reject)=>{
+    const url=URL.createObjectURL(file);
+    const img=new Image();
+    img.onload=()=>{URL.revokeObjectURL(url);resolve(img);};
+    img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Could not read image'));};
+    img.src=url;
+  });
+}
+
+async function makeJpeg(file){
+  const img=await loadImage(file);
+  const canvas=document.createElement('canvas');
+  canvas.width=TARGET_W; canvas.height=TARGET_H;
+  const ctx=canvas.getContext('2d');
+  const scale=Math.max(TARGET_W/img.naturalWidth,TARGET_H/img.naturalHeight);
+  const w=img.naturalWidth*scale, h=img.naturalHeight*scale;
+  const x=(TARGET_W-w)/2, y=(TARGET_H-h)/2;
+  ctx.fillStyle='#000';
+  ctx.fillRect(0,0,TARGET_W,TARGET_H);
+  ctx.drawImage(img,x,y,w,h);
+  const blob=await new Promise((resolve,reject)=>{
+    canvas.toBlob(b=>b?resolve(b):reject(new Error('JPEG conversion failed')),'image/jpeg',0.90);
+  });
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+input.addEventListener('change',async()=>{
+  const file=input.files[0];
+  preview.style.display='none';
+  flashButton.disabled=true;
+  if(!file){log('Choose an image to enable flashing.');return;}
+  if(!file.type.startsWith('image/')){log('Please choose an image file.');return;}
+
+  const previewUrl=URL.createObjectURL(file);
+  preview.src=previewUrl;
+  preview.onload=()=>URL.revokeObjectURL(previewUrl);
+  preview.style.display='block';
+
+  try{
+    const jpeg=await makeJpeg(file);
+    flashButton.disabled=false;
+    log('Image ready. 320×240 JPEG size: '+jpeg.length+' bytes.');
+  }catch(err){
+    log('Image conversion failed: '+(err.message||err));
+  }
+});
+
+async function flash(){
+  const file=input.files[0];
+  if(!file)return;
+  flashButton.disabled=true;
+  let transport=null;
+
+  try{
+    if(!('serial' in navigator)){
+      throw new Error('Web Serial is unavailable. Use desktop Chrome or Edge over HTTPS.');
+    }
+
+    const jpeg=await makeJpeg(file);
+    log('Select the ESP32-S3 USB serial port...');
+    const port=await navigator.serial.requestPort();
+
+    const terminal={clean(){},writeLine(){},write(){}};
+    transport=new esptool.Transport(port,true);
+    const loader=new esptool.ESPLoader({transport,baudrate:921600,terminal});
+
+    log('Connecting to ESP32-S3...');
+    const chip=await loader.main();
+    log('Connected: '+chip+'\nDownloading firmware...');
+
+    const get=name=>fetch(name,{cache:'no-store'}).then(r=>{
+      if(!r.ok)throw new Error(name+' unavailable');
+      return r.arrayBuffer();
+    });
+
+    const [bootloader,partitions,bootApp0,app]=await Promise.all([
+      get('bootloader.bin'),
+      get('partitions.bin'),
+      get('boot_app0.bin'),
+      get('PhotoDisplay.bin')
+    ]);
+
+    const photoImage=new Uint8Array(8+jpeg.length);
+    const dv=new DataView(photoImage.buffer);
+    dv.setUint32(0,PHOTO_MAGIC,true);
+    dv.setUint32(4,jpeg.length,true);
+    photoImage.set(jpeg,8);
+
+    log('Flashing firmware + selected image...');
+
+    await loader.writeFlash({
+      fileArray:[
+        {data:new Uint8Array(bootloader),address:0x0000},
+        {data:new Uint8Array(partitions),address:0x8000},
+        {data:new Uint8Array(bootApp0),address:0xE000},
+        {data:new Uint8Array(app),address:0x10000},
+        {data:photoImage,address:PHOTO_ADDR}
+      ],
+      flashMode:'dio',
+      flashFreq:'40m',
+      flashSize:'16MB',
+      eraseAll:true,
+      compress:true,
+      reportProgress(fileIndex,written,total){
+        const pct=total?((written/total)*100).toFixed(0):'0';
+        log('Flashing part '+(fileIndex+1)+'/5 — '+pct+'%');
+      }
+    });
+
+    await loader.after('hard_reset');
+    log('DONE. Rebooting — your photo should appear on the LCD.');
+  }catch(err){
+    console.error(err);
+    log('FLASH FAILED\n'+(err.message||String(err)));
+  }finally{
+    try{if(transport)await transport.disconnect();}catch(_){}
+    flashButton.disabled=!input.files[0];
+  }
+}
+flashButton.addEventListener('click',flash);
+</script>
 </body>
 </html>
