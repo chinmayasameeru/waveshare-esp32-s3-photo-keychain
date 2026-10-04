@@ -47,7 +47,15 @@ public:
 
 LGFX lcd;
 
+bool isDimmed = false;
+uint32_t lastActivityMs = 0;
+int lastBootState = HIGH;
+
 static constexpr uint8_t BL_PIN = 1;
+static constexpr uint8_t USER_BOOT_PIN = 0;
+static constexpr uint8_t FULL_BRIGHTNESS = 255;
+static constexpr uint8_t DIM_BRIGHTNESS = 32;
+static constexpr uint32_t DIM_AFTER_MS = 30UL * 1000UL;
 static constexpr uint32_t PHOTO_MAGIC = 0x544F4850UL;
 static constexpr uint32_t PHOTO_ADDR = 0x310000UL;
 static constexpr uint32_t PHOTO_HEADER_BYTES = 8UL;
@@ -138,8 +146,11 @@ void setup() {
 
   lcd.init();
   lcd.setRotation(1);
-  lcd.setBrightness(255);
+  pinMode(USER_BOOT_PIN, INPUT_PULLUP);
+
+  lcd.setBrightness(FULL_BRIGHTNESS);
   digitalWrite(BL_PIN, HIGH);
+  lastActivityMs = millis();
 
   Serial.printf(
     "[BOOT] Photo Display | Flash=%lu PSRAM=%lu LCD=%dx%d\n",
@@ -153,5 +164,28 @@ void setup() {
 }
 
 void loop() {
-  delay(1000);
+  const int bootState = digitalRead(USER_BOOT_PIN);
+
+  // BOOT button wakes the display immediately.
+  if (bootState == LOW) {
+    lcd.setBrightness(FULL_BRIGHTNESS);
+    digitalWrite(BL_PIN, HIGH);
+    isDimmed = false;
+    lastActivityMs = millis();
+  }
+
+  // Once the button is released, start the inactivity timer again.
+  if (lastBootState == LOW && bootState == HIGH) {
+    lastActivityMs = millis();
+  }
+
+  lastBootState = bootState;
+
+  if (!isDimmed && (millis() - lastActivityMs >= DIM_AFTER_MS)) {
+    // Keep the photo visible while substantially reducing backlight power.
+    lcd.setBrightness(DIM_BRIGHTNESS);
+    isDimmed = true;
+  }
+
+  delay(10);
 }
