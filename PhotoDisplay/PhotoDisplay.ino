@@ -62,9 +62,10 @@ static constexpr uint8_t USER_BOOT_PIN = 0;
 static constexpr uint16_t DNS_PORT = 53;
 
 static const char* PHOTO_PATH = "/photo.jpg";
+static const char* AP_SSID = "PhotoDisplay";
 static const char* AP_PASSWORD = "photo1234";
 
-static constexpr uint32_t AP_IDLE_MS = 10UL * 60UL * 1000UL;
+static constexpr uint32_t AP_IDLE_MS = 60UL * 60UL * 1000UL;
 static constexpr size_t MAX_PHOTO_BYTES = 4UL * 1024UL * 1024UL;
 
 String apSsid;
@@ -237,57 +238,38 @@ void startAP() {
     return;
   }
 
-  apSsid = String("PhotoDisplay-") +
-           String((uint32_t)(ESP.getEfuseMac() & 0xFFFFFF), HEX);
-  apSsid.toUpperCase();
+  apSsid = AP_SSID;
 
-  WiFi.persistent(false);
-  WiFi.disconnect(true, true);
-  delay(150);
-
+  // Start the ESP32-S3 AP in the simplest possible configuration.
+  // Keep it enabled for testing so the iPhone can always discover it.
   WiFi.mode(WIFI_OFF);
-  delay(100);
+  delay(200);
   WiFi.mode(WIFI_AP);
+  delay(500);
   WiFi.setSleep(false);
-  delay(100);
 
   IPAddress ip(192, 168, 4, 1);
   IPAddress gateway(192, 168, 4, 1);
   IPAddress subnet(255, 255, 255, 0);
   WiFi.softAPConfig(ip, gateway, subnet);
 
-  bool started = false;
-  for (int attempt = 1; attempt <= 3 && !started; ++attempt) {
-    started = WiFi.softAP(apSsid.c_str(), AP_PASSWORD, 1, false, 4);
-    if (!started) {
-      Serial.printf("[AP] softAP failed (attempt %d)\n", attempt);
-      WiFi.mode(WIFI_OFF);
-      delay(200);
-      WiFi.mode(WIFI_AP);
-      WiFi.setSleep(false);
-      delay(100);
-    }
-  }
+  bool started = WiFi.softAP(AP_SSID, AP_PASSWORD, 1, false, 4);
 
   if (!started) {
     apActive = false;
-    Serial.println("[AP] FAILED after 3 attempts");
+    Serial.println("[AP] FAILED");
     drawApScreen("Wi-Fi AP FAILED");
     return;
   }
 
   const IPAddress actualIp = WiFi.softAPIP();
-  dnsServer.start(DNS_PORT, "*", actualIp);
+  dnsServer.start(DNS_PORT, actualIp);
 
   apActive = true;
   lastClientAt = millis();
 
-  Serial.printf(
-    "[AP] SSID=%s PASS=%s IP=%s\n",
-    apSsid.c_str(),
-    AP_PASSWORD,
-    actualIp.toString().c_str()
-  );
+  Serial.printf("[AP] SSID=%s PASS=%s IP=%s\n",
+                AP_SSID, AP_PASSWORD, actualIp.toString().c_str());
 
   if (FFat.exists(PHOTO_PATH)) {
     showStoredPhoto();
@@ -295,7 +277,6 @@ void startAP() {
     drawApScreen();
   }
 }
-
 void stopAP() {
   if (!apActive) return;
 
