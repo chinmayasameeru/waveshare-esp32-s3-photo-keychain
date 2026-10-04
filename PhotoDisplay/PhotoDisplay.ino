@@ -288,8 +288,11 @@ void startAP() {
     actualIp.toString().c_str()
   );
 
-  drawApScreen();
-  showStoredPhoto();
+  if (FFat.exists(PHOTO_PATH)) {
+    showStoredPhoto();
+  } else {
+    drawApScreen();
+  }
 }
 
 void stopAP() {
