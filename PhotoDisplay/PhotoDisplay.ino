@@ -215,17 +215,18 @@ bool validJpegName(const String& name) {
 }
 
 void drawApScreen(const char* status = nullptr) {
+  // Rotation 1 makes the LCD 320x240. Keep all setup text inside 0..239.
   drawNoPhotoScreen();
 
   if (apSsid.length()) {
-    textCenter("Wi-Fi:", 220, 1, TFT_WHITE);
-    textCenter(apSsid.c_str(), 238, 1, TFT_WHITE);
-    textCenter("Password: photo1234", 256, 1, TFT_LIGHTGREY);
-    textCenter("Open 192.168.4.1", 274, 1, TFT_WHITE);
+    textCenter("Wi-Fi:", 182, 1, TFT_WHITE);
+    textCenter(apSsid.c_str(), 198, 1, TFT_WHITE);
+    textCenter("Pass: photo1234", 214, 1, TFT_LIGHTGREY);
+    textCenter("Open: 192.168.4.1", 232, 1, TFT_WHITE);
   }
 
   if (status) {
-    textCenter(status, 302, 1, TFT_RED);
+    textCenter(status, 220, 1, TFT_RED);
   }
 }
 
