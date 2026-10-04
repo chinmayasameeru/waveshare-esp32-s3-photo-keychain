@@ -214,25 +214,69 @@ bool validJpegName(const String& name) {
   return n.endsWith(".jpg") || n.endsWith(".jpeg");
 }
 
+void drawApScreen(const char* status = nullptr) {
+  drawNoPhotoScreen();
+
+  if (apSsid.length()) {
+    textCenter("Wi-Fi:", 220, 1, TFT_WHITE);
+    textCenter(apSsid.c_str(), 238, 1, TFT_WHITE);
+    textCenter("Password: photo1234", 256, 1, TFT_LIGHTGREY);
+    textCenter("Open 192.168.4.1", 274, 1, TFT_WHITE);
+  }
+
+  if (status) {
+    textCenter(status, 302, 1, TFT_RED);
+  }
+}
+
 void startAP() {
   if (apActive) {
     lastClientAt = millis();
+    drawApScreen();
     return;
   }
-
-  WiFi.mode(WIFI_AP);
-  WiFi.setSleep(false);
 
   apSsid = String("PhotoDisplay-") +
            String((uint32_t)(ESP.getEfuseMac() & 0xFFFFFF), HEX);
+  apSsid.toUpperCase();
 
-  if (!WiFi.softAP(apSsid.c_str(), AP_PASSWORD)) {
-    Serial.println("[AP] softAP failed");
+  WiFi.persistent(false);
+  WiFi.disconnect(true, true);
+  delay(150);
+
+  WiFi.mode(WIFI_OFF);
+  delay(100);
+  WiFi.mode(WIFI_AP);
+  WiFi.setSleep(false);
+  delay(100);
+
+  IPAddress ip(192, 168, 4, 1);
+  IPAddress gateway(192, 168, 4, 1);
+  IPAddress subnet(255, 255, 255, 0);
+  WiFi.softAPConfig(ip, gateway, subnet);
+
+  bool started = false;
+  for (int attempt = 1; attempt <= 3 && !started; ++attempt) {
+    started = WiFi.softAP(apSsid.c_str(), AP_PASSWORD, 1, false, 4);
+    if (!started) {
+      Serial.printf("[AP] softAP failed (attempt %d)\n", attempt);
+      WiFi.mode(WIFI_OFF);
+      delay(200);
+      WiFi.mode(WIFI_AP);
+      WiFi.setSleep(false);
+      delay(100);
+    }
+  }
+
+  if (!started) {
+    apActive = false;
+    Serial.println("[AP] FAILED after 3 attempts");
+    drawApScreen("Wi-Fi AP FAILED");
     return;
   }
 
-  const IPAddress ip = WiFi.softAPIP();
-  dnsServer.start(DNS_PORT, "*", ip);
+  const IPAddress actualIp = WiFi.softAPIP();
+  dnsServer.start(DNS_PORT, "*", actualIp);
 
   apActive = true;
   lastClientAt = millis();
@@ -241,9 +285,10 @@ void startAP() {
     "[AP] SSID=%s PASS=%s IP=%s\n",
     apSsid.c_str(),
     AP_PASSWORD,
-    ip.toString().c_str()
+    actualIp.toString().c_str()
   );
 
+  drawApScreen();
   showStoredPhoto();
 }
 
