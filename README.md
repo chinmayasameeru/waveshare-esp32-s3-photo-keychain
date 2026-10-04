@@ -10,12 +10,13 @@ Hardware target:
 - LCD SCLK 39, MOSI 38, MISO 40, DC 42, CS 45, RST -1, BL 1
 
 Features:
-- JPEG photo upload from a phone browser
-- Wi-Fi access point mode
-- JPEG stored in FFat
-- Photo shown on the LCD after upload
-- Built-in screen when no photo is stored
-- Direct browser flashing through ESP Web Tools
+- Prepare and preview any image in the browser
+- Smart crop-to-fill or fit-entire-image framing
+- Adjustable JPEG quality
+- Direct browser flashing through USB
+- JPEG permanently stored in Flash with the firmware
+- Automatic LCD backlight dimming after 30 seconds
+- BOOT button immediately restores full brightness
 
 The firmware is compiled for the app3M_fat9M_16MB partition scheme on 16 MB Flash.
 
