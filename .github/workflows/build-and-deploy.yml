@@ -1,0 +1,88 @@
+name: Build and deploy web flasher
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Arduino CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+          echo "$PWD/bin" >> "$GITHUB_PATH"
+
+      - name: Install ESP32 core and LovyanGFX
+        run: |
+          arduino-cli config init --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@3.3.10
+          arduino-cli lib install LovyanGFX
+
+      - name: Compile
+        run: |
+          arduino-cli compile \
+            --fqbn "esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,CDCOnBoot=cdc,PartitionScheme=app3M_fat9M_16MB" \
+            --warnings all \
+            --output-dir build \
+            PhotoDisplay
+
+      - name: Check build
+        run: |
+          test -f build/PhotoDisplay.ino.bin
+          test -f build/PhotoDisplay.ino.bootloader.bin
+          test -f build/PhotoDisplay.ino.partitions.bin
+          ls -lah build
+
+      - name: Assemble web flasher
+        run: |
+          mkdir -p _site
+          cp web/index.html _site/index.html
+          cp web/manifest.json _site/manifest.json
+          cp build/PhotoDisplay.ino.bootloader.bin _site/bootloader.bin
+          cp build/PhotoDisplay.ino.partitions.bin _site/partitions.bin
+          cp "$(find "$HOME/.arduino15" -name boot_app0.bin | head -n1)" _site/boot_app0.bin
+          cp build/PhotoDisplay.ino.bin _site/PhotoDisplay.bin
+          cp README.md _site/README.md
+          ls -lah _site
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: waveshare-photo-display-firmware
+          path: _site
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
