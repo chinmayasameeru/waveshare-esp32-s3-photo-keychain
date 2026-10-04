@@ -118,11 +118,11 @@ bool showStoredPhoto() {
 
   lcd.fillScreen(TFT_BLACK);
 
-  // LovyanGFX provides a Stream-based JPEG decoder; FFat File is a Stream.
-  // Keep the file open while decoding so no large PSRAM copy is required.
+  // Use LovyanGFX's explicit File data wrapper for JPEG decoding.
   f.seek(0);
+  lgfx::v1::DataWrapperT<fs::File> wrapper(&f);
   const bool ok = lcd.drawJpg(
-    &f,
+    &wrapper,
     0,
     0,
     lcd.width(),
@@ -345,18 +345,18 @@ void setupServer() {
   server.on("/status", HTTP_GET, []() {
     lastClientAt = millis();
 
-    String out = F("{"ap":");
+    String out = "{\\"ap\\":";
     out += apActive ? "true" : "false";
-    out += F(","photo":");
+    out += ",\\"photo\\":";
     out += FFat.exists(PHOTO_PATH) ? "true" : "false";
 
     if (FFat.exists(PHOTO_PATH)) {
       File f = FFat.open(PHOTO_PATH, FILE_READ);
-      out += F(","bytes":");
+      out += ",\\"bytes\\":";
       out += f ? String((unsigned)f.size()) : "0";
       if (f) f.close();
     } else {
-      out += F(","bytes":0");
+      out += ",\\"bytes\\":0";
     }
 
     out += "}";
