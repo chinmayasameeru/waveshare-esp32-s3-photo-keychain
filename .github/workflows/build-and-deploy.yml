@@ -36,11 +36,7 @@ jobs:
 
       - name: Compile for ESP32-S3R8 16 MB Flash + 8 MB OPI PSRAM
         run: |
-          arduino-cli compile \
-            --fqbn "esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,CDCOnBoot=cdc,PartitionScheme=app3M_fat9M_16MB" \
-            --warnings all \
-            --output-dir build \
-            PhotoDisplay
+          arduino-cli compile             --fqbn "esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,CDCOnBoot=cdc"             --warnings all             --output-dir build             PhotoDisplay
 
       - name: Verify firmware outputs
         run: |
@@ -51,18 +47,16 @@ jobs:
           test -s "$(find "$HOME/.arduino15" -name boot_app0.bin | head -n1)"
           ls -lh build/PhotoDisplay.ino*.bin
 
-      - name: Build browser-flasher site
+      - name: Build browser flasher
         run: |
           set -eux
           rm -rf docs
           mkdir -p docs
           cp web/index.html docs/index.html
-          cp web/manifest.json docs/manifest.json
           cp build/PhotoDisplay.ino.bootloader.bin docs/bootloader.bin
           cp build/PhotoDisplay.ino.partitions.bin docs/partitions.bin
           cp "$(find "$HOME/.arduino15" -name boot_app0.bin | head -n1)" docs/boot_app0.bin
           cp build/PhotoDisplay.ino.bin docs/PhotoDisplay.bin
-          cp README.md docs/README.md
           printf '%s\n' "Built from ${GITHUB_SHA:0:7}" > docs/build.txt
           ls -lh docs
 
@@ -72,7 +66,7 @@ jobs:
           name: waveshare-photo-display-firmware
           path: docs/
 
-      - name: Publish web-flasher files to main branch
+      - name: Publish browser flasher to main/docs
         run: |
           set -eux
           git config user.name "github-actions[bot]"
@@ -82,5 +76,5 @@ jobs:
             echo "No docs changes"
             exit 0
           fi
-          git commit -m "Publish web flasher [skip ci]"
+          git commit -m "Publish photo flasher [skip ci]"
           git push origin HEAD:main
