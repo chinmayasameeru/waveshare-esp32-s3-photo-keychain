@@ -1,4 +1,4 @@
-name: Build and deploy web flasher
+name: Build photo display
 
 on:
   push:
@@ -6,20 +6,21 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: pages
+  group: photo-display-build
   cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Install Arduino CLI
         run: |
@@ -33,7 +34,7 @@ jobs:
           arduino-cli core install esp32:esp32@3.3.10
           arduino-cli lib install LovyanGFX
 
-      - name: Compile
+      - name: Compile for ESP32-S3R8 16 MB Flash + 8 MB OPI PSRAM
         run: |
           arduino-cli compile \
             --fqbn "esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,CDCOnBoot=cdc,PartitionScheme=app3M_fat9M_16MB" \
@@ -41,48 +42,45 @@ jobs:
             --output-dir build \
             PhotoDisplay
 
-      - name: Check build
+      - name: Verify firmware outputs
         run: |
-          test -f build/PhotoDisplay.ino.bin
-          test -f build/PhotoDisplay.ino.bootloader.bin
-          test -f build/PhotoDisplay.ino.partitions.bin
-          ls -lah build
+          set -eux
+          test -s build/PhotoDisplay.ino.bin
+          test -s build/PhotoDisplay.ino.bootloader.bin
+          test -s build/PhotoDisplay.ino.partitions.bin
+          test -s "$(find "$HOME/.arduino15" -name boot_app0.bin | head -n1)"
+          ls -lh build/PhotoDisplay.ino*.bin
 
-      - name: Assemble web flasher
+      - name: Build browser-flasher site
         run: |
-          mkdir -p _site
-          cp web/index.html _site/index.html
-          cp web/manifest.json _site/manifest.json
-          cp build/PhotoDisplay.ino.bootloader.bin _site/bootloader.bin
-          cp build/PhotoDisplay.ino.partitions.bin _site/partitions.bin
-          cp "$(find "$HOME/.arduino15" -name boot_app0.bin | head -n1)" _site/boot_app0.bin
-          cp build/PhotoDisplay.ino.bin _site/PhotoDisplay.bin
-          cp README.md _site/README.md
-          ls -lah _site
+          set -eux
+          rm -rf docs
+          mkdir -p docs
+          cp web/index.html docs/index.html
+          cp web/manifest.json docs/manifest.json
+          cp build/PhotoDisplay.ino.bootloader.bin docs/bootloader.bin
+          cp build/PhotoDisplay.ino.partitions.bin docs/partitions.bin
+          cp "$(find "$HOME/.arduino15" -name boot_app0.bin | head -n1)" docs/boot_app0.bin
+          cp build/PhotoDisplay.ino.bin docs/PhotoDisplay.bin
+          cp README.md docs/README.md
+          printf '%s\n' "Built from ${GITHUB_SHA:0:7}" > docs/build.txt
+          ls -lh docs
 
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v4
         with:
           name: waveshare-photo-display-firmware
-          path: _site
+          path: docs/
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: _site
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish web-flasher files to main branch
+        run: |
+          set -eux
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/
+          if git diff --cached --quiet; then
+            echo "No docs changes"
+            exit 0
+          fi
+          git commit -m "Publish web flasher [skip ci]"
+          git push origin HEAD:main
