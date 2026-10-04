@@ -1,6 +1,7 @@
 #define LGFX_USE_V1
 #include <LovyanGFX.hpp>
 #include <esp_flash.h>
+#include <esp_sleep.h>
 
 class LGFX : public lgfx::LGFX_Device {
   lgfx::Panel_ST7789 _panel;
@@ -54,8 +55,7 @@ int lastBootState = HIGH;
 static constexpr uint8_t BL_PIN = 1;
 static constexpr uint8_t USER_BOOT_PIN = 0;
 static constexpr uint8_t FULL_BRIGHTNESS = 255;
-static constexpr uint8_t DIM_BRIGHTNESS = 32;
-static constexpr uint32_t DIM_AFTER_MS = 30UL * 1000UL;
+static constexpr uint32_t SLEEP_AFTER_MS = 30UL * 1000UL;
 static constexpr uint32_t PHOTO_MAGIC = 0x544F4850UL;
 static constexpr uint32_t PHOTO_ADDR = 0x310000UL;
 static constexpr uint32_t PHOTO_HEADER_BYTES = 8UL;
@@ -163,10 +163,32 @@ void setup() {
   showPhoto();
 }
 
+void enterLightSleep() {
+  // GPIO0 can wake ESP32-S3 from light-sleep without rebooting.
+  // This is important because GPIO0 is also the USB boot/strapping button.
+  gpio_wakeup_enable((gpio_num_t)USER_BOOT_PIN, GPIO_INTR_LOW_LEVEL);
+  esp_sleep_enable_gpio_wakeup();
+
+  lcd.setBrightness(0);
+  digitalWrite(BL_PIN, LOW);
+  isDimmed = true;
+
+  Serial.println("[SLEEP] entering light-sleep; press BOOT to wake");
+  esp_light_sleep_start();
+
+  // Woken by the BOOT button. Light-sleep does not reset the application.
+  digitalWrite(BL_PIN, HIGH);
+  lcd.setBrightness(FULL_BRIGHTNESS);
+  isDimmed = false;
+  lastActivityMs = millis();
+
+  Serial.println("[SLEEP] woke up");
+}
+
 void loop() {
   const int bootState = digitalRead(USER_BOOT_PIN);
 
-  // BOOT button wakes the display immediately.
+  // BOOT button wakes the display immediately and keeps it bright while held.
   if (bootState == LOW) {
     lcd.setBrightness(FULL_BRIGHTNESS);
     digitalWrite(BL_PIN, HIGH);
@@ -181,10 +203,9 @@ void loop() {
 
   lastBootState = bootState;
 
-  if (!isDimmed && (millis() - lastActivityMs >= DIM_AFTER_MS)) {
-    // Keep the photo visible while substantially reducing backlight power.
-    lcd.setBrightness(DIM_BRIGHTNESS);
-    isDimmed = true;
+  if (!isDimmed && bootState == HIGH &&
+      (millis() - lastActivityMs >= SLEEP_AFTER_MS)) {
+    enterLightSleep();
   }
 
   delay(10);
