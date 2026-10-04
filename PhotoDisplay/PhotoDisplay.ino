@@ -58,7 +58,7 @@ WebServer server(80);
 DNSServer dnsServer;
 
 static constexpr uint8_t BL_PIN = 1;
-static constexpr uint8_t BOOT_PIN = 0;
+static constexpr uint8_t USER_BOOT_PIN = 0;
 static constexpr uint16_t DNS_PORT = 53;
 
 static const char* PHOTO_PATH = "/photo.jpg";
@@ -109,7 +109,6 @@ bool showStoredPhoto() {
   }
 
   const size_t photoSize = f.size();
-  f.close();
 
   if (photoSize == 0 || photoSize > MAX_PHOTO_BYTES) {
     drawNoPhotoScreen();
@@ -119,14 +118,17 @@ bool showStoredPhoto() {
 
   lcd.fillScreen(TFT_BLACK);
 
-  const bool ok = lcd.drawJpgFile(
-    FFat,
-    PHOTO_PATH,
+  // LovyanGFX provides a Stream-based JPEG decoder; FFat File is a Stream.
+  // Keep the file open while decoding so no large PSRAM copy is required.
+  f.seek(0);
+  const bool ok = lcd.drawJpg(
+    &f,
     0,
     0,
     lcd.width(),
     lcd.height()
   );
+  f.close();
 
   if (!ok) {
     drawNoPhotoScreen();
@@ -377,7 +379,7 @@ void setup() {
 
   pinMode(BL_PIN, OUTPUT);
   digitalWrite(BL_PIN, LOW);
-  pinMode(BOOT_PIN, INPUT_PULLUP);
+  pinMode(USER_BOOT_PIN, INPUT_PULLUP);
 
   Serial.println();
   Serial.println("[BOOT] Waveshare ESP32-S3 Photo Display");
@@ -418,7 +420,7 @@ void loop() {
   server.handleClient();
 
   static int lastBoot = HIGH;
-  const int boot = digitalRead(BOOT_PIN);
+  const int boot = digitalRead(USER_BOOT_PIN);
 
   if (lastBoot == HIGH && boot == LOW) {
     startAP();
