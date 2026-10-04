@@ -1,6 +1,6 @@
 #define LGFX_USE_V1
 #include <LovyanGFX.hpp>
-#include <esp_partition.h>
+#include <esp_flash.h>
 
 class LGFX : public lgfx::LGFX_Device {
   lgfx::Panel_ST7789 _panel;
@@ -48,8 +48,9 @@ public:
 LGFX lcd;
 
 static constexpr uint8_t BL_PIN = 1;
-static constexpr uint32_t PHOTO_MAGIC = 0x544F4850UL; // "PHOT" little-endian
-static constexpr size_t PHOTO_HEADER_BYTES = 8;
+static constexpr uint32_t PHOTO_MAGIC = 0x544F4850UL;
+static constexpr uint32_t PHOTO_ADDR = 0x310000UL;
+static constexpr uint32_t PHOTO_HEADER_BYTES = 8UL;
 
 void centerText(const char* text, int y, int size = 2, uint16_t color = TFT_WHITE) {
   lcd.setTextDatum(lgfx::textdatum_t::middle_center);
@@ -58,9 +59,7 @@ void centerText(const char* text, int y, int size = 2, uint16_t color = TFT_WHIT
   lcd.drawString(text, lcd.width() / 2, y);
 }
 
-void messageScreen(const char* a,
-                   const char* b = nullptr,
-                   const char* c = nullptr,
+void messageScreen(const char* a, const char* b = nullptr, const char* c = nullptr,
                    uint16_t color = TFT_WHITE) {
   lcd.fillScreen(TFT_BLACK);
   centerText(a, 75, 2, color);
@@ -68,9 +67,13 @@ void messageScreen(const char* a,
   if (c) centerText(c, 140, 1, TFT_LIGHTGREY);
 }
 
-bool readU32(const esp_partition_t* part, size_t offset, uint32_t& value) {
+bool readFlash(void* buffer, uint32_t address, uint32_t length) {
+  return esp_flash_read(esp_flash_default_chip, buffer, address, length) == ESP_OK;
+}
+
+bool readU32LE(uint32_t address, uint32_t& value) {
   uint8_t b[4];
-  if (esp_partition_read(part, offset, b, sizeof(b)) != ESP_OK) return false;
+  if (!readFlash(b, address, 4)) return false;
   value = (uint32_t)b[0] |
           ((uint32_t)b[1] << 8) |
           ((uint32_t)b[2] << 16) |
@@ -79,41 +82,32 @@ bool readU32(const esp_partition_t* part, size_t offset, uint32_t& value) {
 }
 
 bool showPhoto() {
-  const esp_partition_t* part = esp_partition_find_first(
-    ESP_PARTITION_TYPE_DATA,
-    ESP_PARTITION_SUBTYPE_DATA_SPIFFS,
-    "photo"
-  );
-
-  if (!part) {
-    messageScreen("PHOTO PARTITION", "not found", "flash the new build", TFT_RED);
-    return false;
-  }
-
   uint32_t magic = 0;
   uint32_t photoSize = 0;
 
-  if (!readU32(part, 0, magic) || !readU32(part, 4, photoSize)) {
-    messageScreen("PHOTO READ ERROR", "cannot read flash", nullptr, TFT_RED);
+  if (!readU32LE(PHOTO_ADDR, magic) ||
+      !readU32LE(PHOTO_ADDR + 4, photoSize)) {
+    messageScreen("PHOTO READ ERROR", "flash read failed", nullptr, TFT_RED);
     return false;
   }
 
+  const uint32_t flashSize = ESP.getFlashChipSize();
   if (magic != PHOTO_MAGIC ||
       photoSize == 0 ||
-      photoSize > part->size - PHOTO_HEADER_BYTES) {
-    messageScreen("NO PHOTO", "choose a JPEG in the flasher", "and flash again");
+      PHOTO_ADDR + PHOTO_HEADER_BYTES + photoSize > flashSize) {
+    messageScreen("NO PHOTO", "choose an image in the flasher", "then flash again");
     return false;
   }
 
   uint8_t* jpeg = (uint8_t*)ps_malloc(photoSize);
   if (!jpeg) {
-    messageScreen("PHOTO TOO LARGE", "not enough PSRAM", nullptr, TFT_RED);
+    messageScreen("PHOTO ERROR", "not enough PSRAM", nullptr, TFT_RED);
     return false;
   }
 
-  if (esp_partition_read(part, PHOTO_HEADER_BYTES, jpeg, photoSize) != ESP_OK) {
+  if (!readFlash(jpeg, PHOTO_ADDR + PHOTO_HEADER_BYTES, photoSize)) {
     free(jpeg);
-    messageScreen("PHOTO READ ERROR", "flash read failed", nullptr, TFT_RED);
+    messageScreen("PHOTO READ ERROR", "could not read image", nullptr, TFT_RED);
     return false;
   }
 
@@ -128,7 +122,7 @@ bool showPhoto() {
   free(jpeg);
 
   if (!ok) {
-    messageScreen("JPEG ERROR", "photo could not be decoded", nullptr, TFT_RED);
+    messageScreen("JPEG ERROR", "image could not be decoded", nullptr, TFT_RED);
     return false;
   }
   return true;
