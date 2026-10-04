@@ -263,7 +263,7 @@ void startAP() {
   }
 
   const IPAddress actualIp = WiFi.softAPIP();
-  dnsServer.start(DNS_PORT, actualIp);
+  dnsServer.start(DNS_PORT, "*", actualIp);
 
   apActive = true;
   lastClientAt = millis();
