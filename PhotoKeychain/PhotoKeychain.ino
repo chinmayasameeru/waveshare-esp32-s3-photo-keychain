@@ -7,7 +7,7 @@
 #include <esp_sleep.h>
 #include "driver/gpio.h"
 
-// Keychain experiment: Stage 4 power management + polished UI
+// Photo Keychain: stable photo transfer + power management
 
 class LGFX : public lgfx::LGFX_Device {
   lgfx::Panel_ST7789 _panel;
@@ -554,7 +554,7 @@ void setup() {
   normalModeSinceMs = millis();
 
   Serial.printf(
-      "[BOOT] Photo Keychain Stage 4 | Flash=%lu PSRAM=%lu LCD=%dx%d\n",
+      "[BOOT] Photo Keychain | Flash=%lu PSRAM=%lu LCD=%dx%d\n",
       (unsigned long)ESP.getFlashChipSize(),
       (unsigned long)ESP.getPsramSize(),
       (int)lcd.width(),
