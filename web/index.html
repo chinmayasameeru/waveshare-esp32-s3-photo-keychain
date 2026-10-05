@@ -2,84 +2,49 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Waveshare Photo Display</title>
-
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#070a12">
+<meta name="description" content="Photo Keychain firmware installer for the Waveshare ESP32-S3.">
+<title>Photo Keychain — Installer</title>
 <style>
-:root{color-scheme:dark}*{box-sizing:border-box}
-body{margin:0;min-height:100vh;padding:24px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#080b12;color:#edf2f7}
-main{width:min(700px,100%);margin:auto;background:#151a23;border:1px solid #293342;border-radius:22px;padding:28px}
-h1{margin:0 0 8px}.sub{color:#aab5c5;line-height:1.5}
-.box{margin-top:18px;padding:18px;border:1px solid #293342;border-radius:16px;background:#0e131b}
-input[type=file]{width:100%;padding:12px;border-radius:12px;border:1px solid #394456;background:#161c26;color:#fff}
-button{width:100%;margin-top:14px;padding:15px;border:0;border-radius:13px;background:#f4f6f8;color:#111;font-size:17px;font-weight:700}
-button:disabled{opacity:.45}
-#preview{display:none;width:100%;max-width:320px;aspect-ratio:4/3;object-fit:cover;border-radius:12px;margin:14px auto 0;border:1px solid #293342}
-#status{margin-top:16px;white-space:pre-wrap;color:#b9c4d5;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;line-height:1.5}
-.note{color:#8f9aae;font-size:13px;line-height:1.55}
+:root{color-scheme:dark;--bg:#06080f;--bg2:#0b1020;--card:rgba(17,22,36,.78);--line:rgba(255,255,255,.09);--line2:rgba(255,255,255,.16);--text:#f6f7fb;--muted:#a5aec0;--muted2:#748097;--accent:#9b8cff;--mint:#63e5c2}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;color:var(--text);background:radial-gradient(900px 500px at 8% -10%,rgba(155,140,255,.22),transparent 60%),radial-gradient(700px 420px at 98% 4%,rgba(99,229,194,.10),transparent 58%),linear-gradient(180deg,var(--bg),var(--bg2));overflow-x:hidden}a{color:inherit}.wrap{width:min(1120px,calc(100% - 28px));margin:auto;padding:18px 0 54px}.nav{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:7px 2px 20px}.brand{display:flex;gap:10px;align-items:center;text-decoration:none;font-weight:780}.mark{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(135deg,#b1a7ff,#83efd0);color:#0b1017;font-weight:900}.pill,.link{font-size:12px;padding:8px 11px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.035);color:var(--muted);text-decoration:none}.pill{color:#d8d1ff;border-color:rgba(155,140,255,.30);background:rgba(155,140,255,.08)}.navlinks{display:flex;gap:9px;align-items:center}.hero{display:grid;grid-template-columns:1.08fr .92fr;gap:16px}.card{border:1px solid var(--line);border-radius:28px;background:var(--card);backdrop-filter:blur(20px);box-shadow:0 25px 80px rgba(0,0,0,.34)}.copy{position:relative;overflow:hidden;padding:40px}.orb{position:absolute;width:360px;height:360px;right:-150px;top:-170px;border-radius:50%;background:radial-gradient(circle,rgba(155,140,255,.25),transparent 68%);pointer-events:none}.eyebrow{position:relative;display:inline-flex;gap:8px;align-items:center;text-transform:uppercase;letter-spacing:.14em;font-size:10px;font-weight:800;color:#cdc7ff}.eyebrow i{width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 15px rgba(99,229,194,.8)}h1{position:relative;font-size:clamp(44px,6vw,74px);line-height:.96;letter-spacing:-.055em;margin:16px 0}.grad{background:linear-gradient(115deg,#fff 10%,#d0caff 48%,#86ead4 92%);-webkit-background-clip:text;background-clip:text;color:transparent}.lead{max-width:680px;margin:0;color:var(--muted);font-size:17px;line-height:1.62}.actions{display:flex;gap:11px;flex-wrap:wrap;margin-top:25px}.btn{display:inline-flex;justify-content:center;align-items:center;min-height:52px;padding:0 18px;border-radius:15px;font-weight:800;text-decoration:none;cursor:pointer}.primary{min-width:255px;border:0;background:linear-gradient(135deg,#fff,#d7d1ff 45%,#b7ffe9);color:#081019;box-shadow:0 12px 34px rgba(155,140,255,.20)}.primary:disabled{opacity:.45;cursor:not-allowed}.secondary{border:1px solid var(--line2);background:rgba(255,255,255,.045)}.micro{position:relative;margin-top:18px;color:var(--muted2);font-size:11px;line-height:1.55}.device-card{display:grid;place-items:center;min-height:430px;padding:24px;position:relative;overflow:hidden}.device{width:min(220px,65vw);aspect-ratio:1/1.47;border-radius:30px;padding:11px;background:linear-gradient(155deg,#2b3242,#10141d 57%,#080b10);border:1px solid rgba(255,255,255,.14);box-shadow:0 35px 55px rgba(0,0,0,.45),inset 0 1px rgba(255,255,255,.11)}.screen{width:100%;height:100%;padding:17px;border-radius:19px;background:radial-gradient(circle at 25% 18%,rgba(155,140,255,.23),transparent 26%),linear-gradient(160deg,#161c2b,#080c14);border:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;justify-content:space-between}.scr-top{font-size:9px;letter-spacing:.17em;color:#9aa5bb;text-transform:uppercase}.scr-title{font-size:22px;font-weight:850;letter-spacing:-.03em}.scr-ok{margin-top:4px;font-size:10px;font-weight:760;color:var(--mint)}.scr-lines{margin:auto 0}.scr-lines b{display:block;width:82%;height:5px;border-radius:99px;background:rgba(255,255,255,.06);margin-top:9px}.scr-lines b:nth-child(2){width:61%}.scr-lines b:nth-child(3){width:73%}.scr-foot{font-size:9px;line-height:1.45;color:#78849a}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.stat{padding:16px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.025)}.k{font-size:9px;text-transform:uppercase;letter-spacing:.13em;color:var(--muted2);font-weight:800}.v{font-size:15px;font-weight:800;margin-top:6px}.n{font-size:10px;color:var(--muted2);margin-top:3px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.panel{padding:26px}.panel h2{margin:0 0 7px;font-size:22px;letter-spacing:-.03em}.panel>p{margin:0;color:var(--muted);font-size:13px;line-height:1.6}.steps{display:grid;gap:10px;margin-top:16px}.step{display:grid;grid-template-columns:31px 1fr;gap:11px;padding:10px 0}.num{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:rgba(155,140,255,.11);border:1px solid rgba(155,140,255,.20);font-size:11px;font-weight:800;color:#ded9ff}.step strong{font-size:13px}.step span{display:block;color:var(--muted);font-size:11px;line-height:1.5;margin-top:3px}.target{background:linear-gradient(160deg,rgba(155,140,255,.08),rgba(99,229,194,.035))}.badge{display:inline-flex;gap:7px;align-items:center;padding:7px 10px;border-radius:999px;font-size:10px;font-weight:800;color:#9ff3de;border:1px solid rgba(99,229,194,.18);background:rgba(99,229,194,.07)}.badge i{width:6px;height:6px;border-radius:50%;background:var(--mint)}.rows{margin-top:15px}.row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.055);font-size:11px}.row:last-child{border-bottom:0}.row span:first-child{color:var(--muted2)}.row span:last-child{font-weight:750}.trust{margin-top:14px;padding:13px;border-radius:15px;border:1px solid rgba(99,229,194,.13);background:rgba(99,229,194,.035);font-size:11px;line-height:1.55;color:var(--muted)}.trust b{color:#d9fff4}.flash{margin-top:14px;padding:25px}.flash-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-end;flex-wrap:wrap}.flash-head h2{margin:0;font-size:25px;letter-spacing:-.035em}.flash-head p{margin:5px 0 0;color:var(--muted);font-size:12px}.hint{text-align:right;color:var(--muted2);font-size:10px;line-height:1.5}.terminal{margin-top:16px;min-height:64px;padding:14px 15px;background:#05070d;border:1px solid var(--line);border-radius:15px;color:#b8c2d5;font:12px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap}.meter{height:6px;background:rgba(255,255,255,.06);border-radius:99px;overflow:hidden;margin-top:10px}.meter i{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--accent),var(--mint));transition:width .2s}.checks{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.check{padding:11px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02)}.check b{display:block;font-size:10px}.check span{display:block;margin-top:3px;color:var(--muted2);font-size:9px}.note-panel{margin-top:14px}.note-panel details{border-top:1px solid var(--line);padding:14px 0}.note-panel details:last-child{border-bottom:1px solid var(--line)}summary{cursor:pointer;font-size:12px;font-weight:750}.note-panel details p{margin:9px 0 0;color:var(--muted);font-size:11px;line-height:1.6}footer{padding:20px 2px 0;display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap;color:var(--muted2);font-size:10px}.flinks{display:flex;gap:13px}@media(max-width:880px){.hero,.grid{grid-template-columns:1fr}.device-card{min-height:320px}.stats{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.wrap{width:calc(100% - 18px);padding-top:8px}.navlinks .link{display:none}.copy,.panel,.flash{padding:21px}h1{font-size:49px}.lead{font-size:15px}.primary,.secondary{width:100%}.hint{text-align:left}.checks{grid-template-columns:1fr}.stats{gap:8px}.stat{padding:14px}}
 </style>
 </head>
 <body>
-<main>
-<h1>Waveshare Photo Display</h1>
-<p class="sub">Select the image you want stored on the board. The browser converts it to a 320×240 JPEG and flashes it together with the firmware. The ESP32 itself uses no Wi-Fi.</p>
-<div class="box">
-<label for="photo"><b>Choose an image</b></label>
-<input id="photo" type="file" accept="image/*">
-<img id="preview" alt="Preview">
-<button id="flash" disabled>⚡ Flash Photo Display</button>
-<div id="status">Choose an image to enable flashing.</div>
+<div class="wrap">
+<nav class="nav"><a class="brand" href="https://github.com/chinmayasameeru/waveshare-photo-display" target="_blank" rel="noreferrer"><span class="mark">P</span><span>Photo Keychain</span></a><div class="navlinks"><span class="pill">● Stable</span><a class="link" href="https://github.com/chinmayasameeru/waveshare-photo-display" target="_blank" rel="noreferrer">Source ↗</a></div></nav>
+<section class="hero">
+<article class="card copy"><div class="orb"></div><div class="eyebrow"><i></i> ESP32-S3 · USB INSTALLER</div><h1>Turn it into a<br><span class="grad">photo keychain.</span></h1><p class="lead">Install the current stable firmware directly from your browser. This step installs firmware only — no photo is requested or uploaded.</p><div class="actions"><button class="btn primary" id="flash">⚡ Flash firmware</button><a class="btn secondary" href="#next">See the workflow ↓</a></div><div class="micro">Requires HTTPS + Web Serial · Desktop Chrome or Edge · USB data cable · Waveshare ESP32-S3 No-Touch board</div></article>
+<div class="card device-card"><div class="device"><div class="screen"><div><div class="scr-top">PHOTO KEYCHAIN</div><div class="scr-title">READY</div><div class="scr-ok">Wi‑Fi · OFF</div></div><div class="scr-lines"><b></b><b></b><b></b></div><div class="scr-foot">Press BOOT<br>to start local photo mode</div></div></div></div>
+</section>
+<section class="stats">
+<div class="stat"><div class="k">MCU</div><div class="v">ESP32-S3R8</div><div class="n">8 MB OPI PSRAM</div></div>
+<div class="stat"><div class="k">Display</div><div class="v">2.0″ ST7789T3</div><div class="n">240 × 320 · No Touch</div></div>
+<div class="stat"><div class="k">Network</div><div class="v">PhotoKeychain</div><div class="n">Local AP · 192.168.4.1</div></div>
+<div class="stat"><div class="k">Flash</div><div class="v">16 MB</div><div class="n">On-device storage</div></div>
+</section>
+<section class="grid" id="next">
+<article class="card panel"><h2>After installation</h2><p>The USB installer is only the setup gate. After reboot, the board can enter its local photo workflow from the BOOT button.</p><div class="steps">
+<div class="step"><div class="num">1</div><div><strong>Connect over USB</strong><span>Use a known-good data cable and select the ESP32-S3 port when prompted.</span></div></div>
+<div class="step"><div class="num">2</div><div><strong>Press BOOT</strong><span>The keychain starts its temporary local Wi‑Fi access point and shows connection details on the LCD.</span></div></div>
+<div class="step"><div class="num">3</div><div><strong>Open the local page</strong><span>Join the keychain's Wi‑Fi network from your phone, then use the local address shown on the display.</span></div></div>
+<div class="step"><div class="num">4</div><div><strong>Choose a photo</strong><span>The transfer workflow is intended to stay local to the keychain and phone.</span></div></div>
+</div></article>
+<article class="card panel target"><div style="display:flex;justify-content:space-between;gap:12px;align-items:start"><div><h2>Hardware target</h2><p>Designed for the Waveshare 2-inch No-Touch board.</p></div><span class="badge"><i></i> Stable</span></div><div class="rows">
+<div class="row"><span>LCD</span><span>ST7789T3</span></div><div class="row"><span>Resolution</span><span>240 × 320</span></div><div class="row"><span>Flash</span><span>16 MB</span></div><div class="row"><span>PSRAM</span><span>8 MB OPI</span></div><div class="row"><span>Wi‑Fi mode</span><span>Local AP</span></div><div class="row"><span>Default AP address</span><span>192.168.4.1</span></div>
+</div><div class="trust"><b>🔒 Local by design.</b> This installer does not ask for a photo and does not contain application credentials. Firmware is fetched by your browser and written over USB to the selected board.</div></article>
+</section>
+<section class="card flash" id="flasher"><div class="flash-head"><div><h2>Install the firmware</h2><p>Firmware assets are served from the published experiment bundle.</p></div><div class="hint">No Arduino IDE<br>USB · Web Serial · HTTPS</div></div><div class="terminal" id="status" role="status" aria-live="polite">Ready. Connect the ESP32-S3 by USB, then start the installer.</div><div class="meter"><i id="meter"></i></div><div class="checks"><div class="check"><b id="check-browser">Browser check</b><span>Web Serial support</span></div><div class="check"><b id="check-port">USB connection</b><span>Your selected serial port</span></div><div class="check"><b id="check-build">Firmware bundle</b><span>Published by CI</span></div></div></section>
+<section class="card panel note-panel"><h2>Before you flash</h2><details><summary>Use the No-Touch board</summary><p>This experiment targets the Waveshare ESP32-S3 2-inch No-Touch display and ST7789T3 wiring. The Touch-LCD-2 variant uses different hardware.</p></details><details><summary>What is stable?</summary><p>The iPhone transfer, power behavior, and keychain experience are still under development. Treat this as an experiment rather than the stable release.</p></details><details><summary>Need the legacy USB photo display?</summary><p>See the `PhotoDisplay-Legacy/` directory for the original static USB photo-display implementation.</p></details></section>
+<footer><span>Waveshare ESP32-S3 Photo Keychain · Stable</span><div class="flinks"><a href="https://github.com/chinmayasameeru/waveshare-photo-display" target="_blank" rel="noreferrer">GitHub</a><a href="https://chinmayasameeru.github.io/waveshare-photo-display/" target="_blank" rel="noreferrer">Stable flasher</a></div></footer>
 </div>
-<div class="box">
-<b>USB</b>
-<p class="note">Use desktop Chrome or Edge over HTTPS with the ESP32-S3 connected by USB. After flashing, unplug/replug the board; it will show the selected image automatically.</p>
-</div>
-</main>
 <script type="module">
-import { ESPLoader, Transport } from "https://unpkg.com/esptool-js@0.7.0/bundle.js";
-
-const PHOTO_ADDR=0x310000,PHOTO_MAGIC=0x544F4850,TARGET_W=320,TARGET_H=240;
-const input=document.getElementById('photo'),preview=document.getElementById('preview'),flashButton=document.getElementById('flash'),status=document.getElementById('status');
-function log(msg){status.textContent=msg}
-function loadImage(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file),img=new Image();img.onload=()=>{URL.revokeObjectURL(url);resolve(img)};img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Could not read image'))};img.src=url})}
-async function makeJpeg(file){
- const img=await loadImage(file),canvas=document.createElement('canvas');canvas.width=TARGET_W;canvas.height=TARGET_H;
- const ctx=canvas.getContext('2d'),scale=Math.max(TARGET_W/img.naturalWidth,TARGET_H/img.naturalHeight),w=img.naturalWidth*scale,h=img.naturalHeight*scale,x=(TARGET_W-w)/2,y=(TARGET_H-h)/2;
- ctx.fillStyle='#000';ctx.fillRect(0,0,TARGET_W,TARGET_H);ctx.drawImage(img,x,y,w,h);
- const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('JPEG conversion failed')),'image/jpeg',0.90));
- return new Uint8Array(await blob.arrayBuffer());
-}
-input.addEventListener('change',async()=>{
- const file=input.files[0];preview.style.display='none';flashButton.disabled=true;
- if(!file){log('Choose an image to enable flashing.');return}
- if(!file.type.startsWith('image/')){log('Please choose an image file.');return}
- const previewUrl=URL.createObjectURL(file);preview.src=previewUrl;preview.onload=()=>URL.revokeObjectURL(previewUrl);preview.style.display='block';
- try{const jpeg=await makeJpeg(file);flashButton.disabled=false;log('Image ready. 320×240 JPEG size: '+jpeg.length+' bytes.')}
- catch(err){log('Image conversion failed: '+(err.message||err))}
-});
-async function flash(){
- const file=input.files[0];if(!file)return;flashButton.disabled=true;let transport=null;
- try{
-  if(!('serial' in navigator))throw new Error('Web Serial is unavailable. Use desktop Chrome or Edge over HTTPS.');
-  const jpeg=await makeJpeg(file);log('Select the ESP32-S3 USB serial port...');const port=await navigator.serial.requestPort();
-  const terminal={clean(){},writeLine(){},write(){}};transport=new Transport(port,true);const loader=new ESPLoader({transport,baudrate:115200,terminal});
-  log('Connecting to ESP32-S3...');const chip=await loader.main();log('Connected: '+chip+'\nDownloading firmware...');
-  const get=name=>fetch(name,{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(name+' unavailable');return r.arrayBuffer()});
-  const [bootloader,partitions,bootApp0,app]=await Promise.all([get('bootloader.bin'),get('partitions.bin'),get('boot_app0.bin'),get('PhotoDisplay.bin')]);
-  const photoImage=new Uint8Array(8+jpeg.length),dv=new DataView(photoImage.buffer);dv.setUint32(0,PHOTO_MAGIC,true);dv.setUint32(4,jpeg.length,true);photoImage.set(jpeg,8);
-  log('Flashing firmware + selected image...');
-  await loader.writeFlash({
-   fileArray:[
-    {data:new Uint8Array(bootloader),address:0x0000},{data:new Uint8Array(partitions),address:0x8000},
-    {data:new Uint8Array(bootApp0),address:0xE000},{data:new Uint8Array(app),address:0x10000},{data:photoImage,address:PHOTO_ADDR}],
-   flashMode:'dio',flashFreq:'40m',flashSize:'16MB',eraseAll:true,compress:true,
-   reportProgress(fileIndex,written,total){const pct=total?((written/total)*100).toFixed(0):'0';log('Flashing part '+(fileIndex+1)+'/5 — '+pct+'%')}
-  });
-  await loader.after('hard_reset');log('DONE. Rebooting — your photo should appear on the LCD.');
- }catch(err){console.error(err);log('FLASH FAILED\n'+(err.message||String(err)));}
- finally{try{if(transport)await transport.disconnect()}catch(_){}flashButton.disabled=!input.files[0]}
-}
-flashButton.addEventListener('click',flash);
+const button=document.getElementById("flash"),status=document.getElementById("status"),meter=document.getElementById("meter"),browser=document.getElementById("check-browser"),port=document.getElementById("check-port"),build=document.getElementById("check-build");
+const log=t=>status.textContent=t; const pct=n=>meter.style.width=Math.max(0,Math.min(100,n))+"%"; const good=(el,t)=>{el.textContent=t;el.style.color="#9df4df"};
+if("serial" in navigator) good(browser,"✓ Browser ready"); else {browser.textContent="✕ Web Serial unavailable";browser.style.color="#ff9aa7";button.disabled=true}
+async function getBinary(name){const r=await fetch(name,{cache:"no-store"});if(!r.ok)throw new Error(name+" is unavailable from this build.");return new Uint8Array(await r.arrayBuffer())}
+button.addEventListener("click",async()=>{button.disabled=true;pct(0);let transport=null;try{if(!("serial" in navigator))throw new Error("Web Serial is unavailable. Use desktop Chrome or Edge over HTTPS.");log("Choose the ESP32-S3 USB serial port from the browser dialog…");const selected=await navigator.serial.requestPort();good(port,"✓ Port selected");const {ESPLoader,Transport}=await import("https://unpkg.com/esptool-js@0.7.0/bundle.js");transport=new Transport(selected,true);const loader=new ESPLoader({transport,baudrate:115200,terminal:{clean(){},writeLine(){},write(){}}});log("Connecting to ESP32-S3…");const chip=await loader.main();log("Connected: "+chip+"\nChecking firmware bundle…");const files=[["bootloader.bin",0x0000],["partitions.bin",0x8000],["boot_app0.bin",0xE000],["PhotoDisplay.bin",0x10000]];const data=await Promise.all(files.map(([n])=>getBinary(n)));good(build,"✓ Bundle ready");log("Firmware bundle ready ("+Math.round(data.reduce((s,b)=>s+b.length,0)/1024)+" KB).\nStarting install…");await loader.writeFlash({fileArray:data.map((d,i)=>({data:d,address:files[i][1]})),flashMode:"dio",flashFreq:"40m",flashSize:"16MB",eraseAll:true,compress:true,reportProgress(fileIndex,written,total){const part=total?(written/total)*100:0,overall=((fileIndex+part/100)/files.length)*100;pct(overall);log("Flashing "+files[fileIndex][0]+" · "+part.toFixed(0)+"%\nOverall progress · "+overall.toFixed(0)+"%")}});await loader.after("hard_reset");pct(100);log("✓ Firmware installed successfully.\n\nThe keychain is rebooting.\nPress BOOT to start local photo mode.");button.textContent="✓ Firmware installed"}catch(err){console.error(err);pct(0);log("FLASH FAILED\n"+(err?.message||String(err)));button.disabled=false}finally{try{if(transport)await transport.disconnect()}catch(_){}}});
 </script>
 </body>
 </html>
