@@ -1,136 +1,194 @@
-# Waveshare ESP32-S3 Photo Display
+<div align="center">
 
-![Build](https://github.com/chinmayasameeru/waveshare-photo-display/actions/workflows/build-and-deploy.yml/badge.svg)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
-![Platform](https://img.shields.io/badge/Platform-ESP32--S3-red.svg)
-![Framework](https://img.shields.io/badge/Framework-Arduino-00979D.svg)
-![Display](https://img.shields.io/badge/Display-ST7789T3-6f42c1.svg)
+# 📸 Waveshare ESP32-S3 Photo Display
 
-A lightweight, browser-flashable photo display for the **Waveshare ESP32-S3 2inch No-Touch Display Development Board**.
+**A tiny standalone photo frame for the Waveshare ESP32-S3 2-inch No-Touch display.**
 
-The current project is deliberately focused on one reliable workflow:
+Select an image in your browser → connect by USB → flash → **your photo appears on the LCD.**
 
-> **Choose a photo in the browser → connect the ESP32-S3 by USB → flash → the photo appears on the LCD.**
+<br>
 
-The firmware does not require Wi-Fi, BLE, a companion app, or a cloud service.
+[![Build](https://github.com/chinmayasameeru/waveshare-photo-display/actions/workflows/build-and-deploy.yml/badge.svg)](https://github.com/chinmayasameeru/waveshare-photo-display/actions/workflows/build-and-deploy.yml)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-ESP32--S3-red.svg)](#-hardware)
+[![Framework](https://img.shields.io/badge/Framework-Arduino-00979D.svg)](#-build-from-source)
+[![Display](https://img.shields.io/badge/Display-ST7789T3-6f42c1.svg)](#-hardware)
+[![Flash](https://img.shields.io/badge/Flash-16%20MB-4c8fbe.svg)](#-hardware)
+[![PSRAM](https://img.shields.io/badge/PSRAM-8%20MB-7b61a8.svg)](#-hardware)
 
----
+<br>
 
-## ✨ Features
+**[⚡ Open the Web Flasher](https://chinmayasameeru.github.io/waveshare-photo-display/)**
 
-- **Browser-based flashing** through USB Web Serial
-- Local image preparation in the browser
-- Automatic conversion to **320 × 240 JPEG**
-- Photo stored directly in external Flash
-- JPEG decoded from Flash using **PSRAM + LovyanGFX**
-- ST7789T3 display support for the **No-Touch** Waveshare board
-- GitHub Actions build and GitHub Pages deployment
-- Reproducible Arduino CLI build configuration
-- Simple recovery path: select another image and flash again
+</div>
 
 ---
 
-## 🚀 Flash from your browser
+## ✨ What this is
 
-The easiest way to use the project is the GitHub Pages flasher:
+A focused ESP32-S3 photo display with a deliberately simple user experience:
 
-[**Open the Photo Display Web Flasher →**](https://chinmayasameeru.github.io/waveshare-photo-display/)
+> **Choose photo → prepare locally in the browser → flash over USB → display**
 
-You need a desktop browser with Web Serial support, such as current **Chrome or Edge**.
+The stable firmware is intentionally **offline-first**. It does not require Wi-Fi, BLE, a companion app, or cloud storage.
 
-### Flashing procedure
+### At a glance
 
-1. Open the web flasher.
-2. Select the image you want displayed.
-3. Check the browser preview.
-4. Connect the board to the computer with a **USB-C data cable**.
-5. Click **Flash Photo Display**.
+| | |
+|---|---|
+| 🧠 **MCU** | ESP32-S3R8 |
+| 💾 **Storage** | 16 MB external Flash |
+| 🧠 **Memory** | 8 MB OPI PSRAM |
+| 🖼️ **Display** | 2.0-inch ST7789T3 IPS |
+| 📐 **Panel** | 240 × 320 |
+| 🎨 **Graphics** | LovyanGFX |
+| 🌐 **Setup** | Browser + USB |
+| 📱 **Mobile flashing** | Not supported; use desktop Chrome/Edge |
+
+---
+
+## 🚀 Flash it from your browser
+
+No Arduino IDE is required for normal photo flashing.
+
+### **[👉 Start the Web Flasher](https://chinmayasameeru.github.io/waveshare-photo-display/)**
+
+1. Open the flasher in **desktop Chrome or Edge**.
+2. Select the image you want on the display.
+3. Check the generated **320 × 240** preview.
+4. Connect the board with a **USB-C data cable**.
+5. Click **⚡ Flash Photo Display**.
 6. Select the ESP32-S3 serial port.
-7. Wait for the firmware and photo to finish flashing.
-8. The board resets and displays the selected image.
+7. Wait for the process to complete.
+8. The board resets and shows your photo.
 
-The browser performs the image conversion locally. The original image is not uploaded to a cloud service by this project.
+The browser performs the image conversion locally. The project does not send the selected image to a cloud service.
 
-> **Important:** Web Serial is a desktop-browser capability. The flasher is not intended to run from iPhone Safari or other mobile browsers.
+> **Web Serial note:** Web Serial is not available in iPhone Safari, iPad Safari, Firefox, or other unsupported mobile browsers. The current flasher is designed for desktop Chrome/Edge.
+
+---
+
+## 🖼️ Image pipeline
+
+The browser turns the selected source image into a display-ready JPEG before flashing.
+
+```text
+┌─────────────────┐
+│  Your photo     │
+│  JPG / PNG / …  │
+└────────┬────────┘
+         │
+         ▼
+┌────────────────────────────┐
+│ Browser-side image prepare │
+│ • crop to fill             │
+│ • fit to frame             │
+│ • 320 × 240 output         │
+│ • JPEG compression         │
+└────────┬───────────────────┘
+         │ USB
+         ▼
+┌────────────────────────────┐
+│ ESP32-S3 Flash              │
+│ • firmware                  │
+│ • photo container           │
+└────────┬───────────────────┘
+         │
+         ▼
+┌────────────────────────────┐
+│ PSRAM + LovyanGFX           │
+│ JPEG decode → ST7789T3 LCD  │
+└────────────────────────────┘
+```
+
+The photo is stored at **`0x310000`** using a compact 8-byte header:
+
+| Offset | Size | Meaning |
+|---:|---:|---|
+| `0x00` | 4 bytes | Photo magic |
+| `0x04` | 4 bytes | JPEG length |
+| `0x08` | variable | JPEG payload |
 
 ---
 
 ## 🧩 Hardware
 
-This project targets the **Waveshare ESP32-S3 2inch No-Touch Display Development Board**.
+This repository targets the **Waveshare ESP32-S3 2inch No-Touch Display Development Board**.
 
 | Component | Specification |
 |---|---|
 | MCU | ESP32-S3R8 |
 | External Flash | 16 MB |
 | PSRAM | 8 MB OPI |
-| Display | ST7789T3, 2.0-inch IPS |
+| LCD | ST7789T3, 2.0-inch IPS |
 | Resolution | 240 × 320 |
 | Touch | None |
-| Graphics library | LovyanGFX |
+| Graphics | LovyanGFX |
 
 ### LCD pin map
 
 | Signal | GPIO |
 |---|---:|
-| SCLK | 39 |
-| MOSI | 38 |
-| MISO | 40 |
-| DC | 42 |
-| CS | 45 |
-| RST | -1 |
-| Backlight | 1 |
+| LCD SCLK | 39 |
+| LCD MOSI | 38 |
+| LCD MISO | 40 |
+| LCD DC | 42 |
+| LCD CS | 45 |
+| LCD RST | -1 |
+| LCD Backlight | 1 |
 
-The display configuration uses **ST7789T3 inversion enabled** and the board-specific SPI wiring above.
-
-> **Board variant warning:** this repository targets the **No-Touch** board. Do not copy touch-board reset or peripheral pin mappings from other Waveshare ESP32-S3 2-inch projects without checking the exact hardware variant.
+> ⚠️ **No-Touch board only.**  
+> The Waveshare Touch-LCD-2 variant uses different peripherals/pin assignments in places. Do not copy touch-board reset or peripheral mappings into this project without verifying the exact hardware revision.
 
 ---
 
-## 🏗️ How it works
+## 🧠 Firmware architecture
 
-The browser prepares the selected image as a 320 × 240 JPEG and writes a small photo container together with the firmware image.
+The firmware keeps the runtime deliberately small.
 
-At boot, the ESP32:
+### Boot
 
-1. initializes the ST7789T3 through LovyanGFX;
-2. reads the photo header from Flash;
-3. validates the stored JPEG size;
-4. copies the JPEG into PSRAM;
-5. decodes the JPEG with LovyanGFX;
-6. renders it to the LCD.
+```text
+Power on
+  │
+  ├─► Initialize ST7789T3 / LovyanGFX
+  │
+  ├─► Read photo header from Flash
+  │
+  ├─► Validate photo size
+  │
+  ├─► Allocate JPEG buffer in PSRAM
+  │
+  ├─► Read JPEG from Flash
+  │
+  └─► Decode + render to LCD
+```
 
-The photo is stored in Flash, so it remains available across resets and power cycles.
+The stored photo survives reset and power cycling because the image is kept in external Flash.
 
-### Photo storage
+### Design priorities
 
-The photo container starts at:
-
-`0x310000`
-
-The current stable container begins with an 8-byte header:
-
-| Offset | Size | Meaning |
-|---:|---:|---|
-| `0x00` | 4 bytes | Photo magic |
-| `0x04` | 4 bytes | JPEG size |
-| `0x08` | variable | JPEG data |
-
-The firmware checks that the recorded JPEG fits within the installed Flash capacity before allocating the JPEG buffer in PSRAM.
+- **Simple:** one sketch, one browser flasher
+- **Local:** image preparation happens in the browser
+- **Predictable:** fixed display target and storage location
+- **Recoverable:** re-flashing with another image restores the display
+- **Lightweight:** JPEG data is staged through PSRAM for decoding
 
 ---
 
 ## 🛠️ Build from source
 
-The repository is built with **Arduino CLI** and GitHub Actions.
+GitHub Actions builds the project with a fixed Arduino toolchain and publishes the browser flasher to GitHub Pages.
 
 ### Toolchain
 
-- Arduino-ESP32 **3.3.10**
-- LovyanGFX
-- ESP32-S3R8 target
-- 16 MB Flash
-- 8 MB OPI PSRAM
+| Tool | Version |
+|---|---|
+| Arduino-ESP32 | **3.3.10** |
+| Graphics library | **LovyanGFX** |
+| Target | **ESP32-S3R8** |
+| Flash | **16 MB** |
+| PSRAM | **8 MB OPI** |
 
 ### FQBN
 
@@ -139,8 +197,6 @@ esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,CDCOnBoot=cdc,PartitionScheme=app3M_
 ```
 
 ### Arduino CLI
-
-Install Arduino CLI, then:
 
 ```bash
 arduino-cli config init \
@@ -157,37 +213,72 @@ arduino-cli compile \
   PhotoDisplay
 ```
 
-The GitHub Actions workflow performs the same core build, verifies the expected binary outputs, assembles the GitHub Pages flasher assets, and publishes them under `docs/`.
+### Continuous integration
+
+Every change to `main` is built by GitHub Actions. The workflow:
+
+1. installs the pinned ESP32 core;
+2. installs LovyanGFX;
+3. compiles the ESP32-S3 firmware;
+4. verifies the expected binary outputs;
+5. assembles the browser flasher files;
+6. publishes the generated flasher under `docs/`.
 
 ---
 
 ## 🔍 Troubleshooting
 
-### The board does not appear in the browser
+<details>
+<summary><b>🖥️ The board does not appear in the browser</b></summary>
 
-- Use desktop **Chrome or Edge**.
-- Make sure the page is loaded over **HTTPS**.
-- Use a USB-C **data** cable.
-- Disconnect other serial applications that may already have the port open.
-- Reconnect the board and try the Web Serial port picker again.
+Use desktop **Chrome or Edge** over HTTPS.
 
-### The LCD is blank
+Also check:
 
-- Verify that the exact **No-Touch** Waveshare board is being used.
-- Verify the firmware build targets ESP32-S3R8 with 16 MB Flash and OPI PSRAM.
-- Check that the LCD wiring matches the pin map in this README.
-- Re-run the browser flasher with a normal JPEG.
+- the USB-C cable supports data;
+- no other application already owns the serial port;
+- the board is connected directly or through a known-good USB hub;
+- the Web Serial permission dialog is allowed to access the board.
 
-### The photo is not displayed
+</details>
 
-The current firmware expects:
+<details>
+<summary><b>🖼️ The LCD is blank after flashing</b></summary>
 
-- a valid photo container at `0x310000`;
+Confirm that:
+
+- the board is the **No-Touch** variant;
+- the firmware target is ESP32-S3R8;
+- Flash is configured as 16 MB;
+- PSRAM is configured as OPI;
+- the selected source image was accepted by the browser.
+
+Re-run the web flasher with a normal JPEG as the simplest recovery procedure.
+
+</details>
+
+<details>
+<summary><b>📷 The photo is not displayed</b></summary>
+
+The firmware expects a valid photo container at `0x310000` with:
+
+- a valid magic value;
 - a non-zero JPEG length;
-- JPEG data that fits inside the detected Flash;
-- enough PSRAM to hold the JPEG during decoding.
+- a JPEG that fits within installed Flash;
+- enough PSRAM for temporary JPEG storage.
 
-A complete re-flash using the web flasher is the simplest recovery procedure.
+A complete re-flash is the recommended recovery path.
+
+</details>
+
+<details>
+<summary><b>🔌 USB flashing fails</b></summary>
+
+Use the board's USB-C connection with a data-capable cable and try desktop Chrome/Edge again.
+
+If the board does not enter download mode automatically, use the board's **BOOT** and **RESET/EN** controls to enter the ESP32-S3 download mode, then retry the flasher.
+
+</details>
 
 ---
 
@@ -198,42 +289,34 @@ A complete re-flash using the web flasher is the simplest recovery procedure.
 ├── PhotoDisplay/
 │   └── PhotoDisplay.ino          # ESP32-S3 firmware
 ├── web/
-│   └── index.html                # Browser photo flasher
-├── docs/
-│   ├── index.html                # Published GitHub Pages flasher
+│   └── index.html                # Browser photo flasher source
+├── docs/                         # GitHub Pages output generated by CI
+│   ├── index.html
 │   ├── bootloader.bin
 │   ├── partitions.bin
 │   ├── boot_app0.bin
 │   └── PhotoDisplay.bin
 ├── .github/
 │   └── workflows/
-│       └── build-and-deploy.yml  # Build + Pages deployment
+│       └── build-and-deploy.yml  # Build + deployment pipeline
 ├── CONTRIBUTING.md
 ├── LICENSE
 └── README.md
 ```
 
-The `docs/` firmware binaries are generated by CI; source files under `PhotoDisplay/` and `web/` are the primary project sources.
+> **Generated files:** `docs/` is release output generated by GitHub Actions. Make source changes in `PhotoDisplay/`, `web/`, `.github/workflows/`, and the documentation files.
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome.
+Contributions are welcome and encouraged.
 
 Please read **[CONTRIBUTING.md](CONTRIBUTING.md)** before opening an issue or pull request.
 
-Good contributions include:
+For hardware changes, always identify the exact Waveshare board variant and document any GPIO or electrical assumptions.
 
-- bug fixes;
-- build and flashing reliability improvements;
-- display-rendering improvements;
-- browser UI improvements;
-- documentation improvements;
-- support for additional image formats or safer image handling;
-- reproducible build and CI improvements.
-
-For hardware-related changes, please state the exact Waveshare board variant and any GPIO or wiring changes involved.
+For browser-flasher changes, preserve the local/offline image-processing behavior and keep the published assets synchronized with the firmware build.
 
 ---
 
@@ -247,22 +330,49 @@ Third-party libraries and tools remain under their respective licenses.
 
 ## 🙏 Credits & references
 
-The project uses **[LovyanGFX](https://github.com/lovyan03/LovyanGFX)** for the display stack.
+### Libraries
 
-The repository structure, presentation style, and browser-flashing documentation were informed by the excellent **[Waveshare ESP32-S3 2inch Capacitive Touch Display — Marble Roller Game](https://github.com/OzInFl/Waveshare-ESP32-S3-2inch-Capacitive-Touch-Display-Marble-Roller-Game)** project by OzInFl. That project targets the **Touch-LCD-2** hardware; this repository is adapted specifically for the **No-Touch** display variant and should be treated as a separate project.
+- **[LovyanGFX](https://github.com/lovyan03/LovyanGFX)** — display driver and graphics
+- **[Arduino ESP32](https://github.com/espressif/arduino-esp32)** — ESP32 Arduino core
+
+### Hardware
+
+- **[Waveshare](https://www.waveshare.com/)** — ESP32-S3 display hardware
+
+### Reference project
+
+The documentation style and browser-flashing presentation were influenced by the excellent **[Waveshare ESP32-S3 2inch Capacitive Touch Display — Marble Roller Game](https://github.com/OzInFl/Waveshare-ESP32-S3-2inch-Capacitive-Touch-Display-Marble-Roller-Game)** by **OzInFl**.
+
+That reference project targets the **Touch-LCD-2** board. This repository targets the **No-Touch** board and is a separate implementation.
 
 ---
 
 ## 📌 Project status
 
-The current stable release intentionally prioritizes a simple USB workflow:
+**Stable workflow:**
 
-**select photo → browser prepares JPEG → USB flash → display photo**
+```text
+Select photo
+     ↓
+Browser prepares 320 × 240 JPEG
+     ↓
+USB browser flasher
+     ↓
+ESP32-S3 Flash
+     ↓
+LovyanGFX + PSRAM
+     ↓
+Photo on ST7789T3
+```
 
-Wi-Fi/iPhone photo transfer is not part of the current stable firmware.
+Wi-Fi/iPhone photo transfer is **not part of the current stable firmware**.
 
 ---
 
-## ⭐ Project goal
+<div align="center">
 
-Make the Waveshare ESP32-S3 2-inch No-Touch display useful as a compact standalone photo frame/keychain display without requiring a desktop IDE for normal photo changes.
+### ⭐ Simple setup. Local processing. Tiny photo display.
+
+**[⚡ Launch the Web Flasher](https://chinmayasameeru.github.io/waveshare-photo-display/)**
+
+</div>
