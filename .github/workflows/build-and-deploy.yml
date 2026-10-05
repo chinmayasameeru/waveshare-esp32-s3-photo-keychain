@@ -37,7 +37,11 @@ jobs:
 
       - name: Compile Photo Keychain
         run: |
-          arduino-cli compile             --fqbn "esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,CDCOnBoot=cdc,PartitionScheme=app3M_fat9M_16MB"             --warnings all             --output-dir build             PhotoKeychain
+          arduino-cli compile \
+            --fqbn "esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,CDCOnBoot=cdc,PartitionScheme=app3M_fat9M_16MB" \
+            --warnings all \
+            --output-dir build \
+            PhotoKeychain
 
       - name: Verify firmware outputs
         run: |
@@ -57,8 +61,7 @@ jobs:
           cp build/PhotoKeychain.ino.partitions.bin docs/partitions.bin
           cp "$(find "$HOME/.arduino15" -name boot_app0.bin | head -n1)" docs/boot_app0.bin
           cp build/PhotoKeychain.ino.bin docs/PhotoKeychain.bin
-          printf "Built from %s
-" "$GITHUB_SHA" > docs/build.txt
+          printf 'Built from %s\n' "$GITHUB_SHA" > docs/build.txt
           ls -lh docs
 
       - name: Upload firmware artifact
