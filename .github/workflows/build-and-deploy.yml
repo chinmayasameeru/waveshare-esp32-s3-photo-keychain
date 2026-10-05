@@ -1,22 +1,22 @@
-name: Build photo keychain
+name: Build Photo Keychain
 
 on:
   push:
     branches:
       - main
-      - experiment/photo-keychain
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: photo-display-build
+  group: photo-keychain-build
   cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,13 +35,9 @@ jobs:
           arduino-cli core install esp32:esp32@3.3.10
           arduino-cli lib install LovyanGFX
 
-      - name: Compile for ESP32-S3R8 16 MB Flash + 8 MB OPI PSRAM
+      - name: Compile Photo Keychain
         run: |
-          arduino-cli compile \
-            --fqbn "esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,CDCOnBoot=cdc,PartitionScheme=app3M_fat9M_16MB" \
-            --warnings all \
-            --output-dir build \
-            PhotoKeychain
+          arduino-cli compile             --fqbn "esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,CDCOnBoot=cdc,PartitionScheme=app3M_fat9M_16MB"             --warnings all             --output-dir build             PhotoKeychain
 
       - name: Verify firmware outputs
         run: |
@@ -51,69 +47,35 @@ jobs:
           test -s build/PhotoKeychain.ino.partitions.bin
           test -s "$(find "$HOME/.arduino15" -name boot_app0.bin | head -n1)"
 
-      - name: Build Pages bundle
+      - name: Build GitHub Pages bundle
         run: |
           set -eux
-          rm -rf pages-bundle
-          mkdir -p pages-bundle
-          cp web/index.html pages-bundle/index.html
-          cp build/PhotoKeychain.ino.bootloader.bin pages-bundle/bootloader.bin
-          cp build/PhotoKeychain.ino.partitions.bin pages-bundle/partitions.bin
-          cp "$(find "$HOME/.arduino15" -name boot_app0.bin | head -n1)" pages-bundle/boot_app0.bin
-          cp build/PhotoKeychain.ino.bin pages-bundle/PhotoKeychain.bin
-          printf "Built from %s\n" "${GITHUB_SHA:0:7}" > pages-bundle/build.txt
+          rm -rf docs
+          mkdir -p docs
+          cp web/index.html docs/index.html
+          cp build/PhotoKeychain.ino.bootloader.bin docs/bootloader.bin
+          cp build/PhotoKeychain.ino.partitions.bin docs/partitions.bin
+          cp "$(find "$HOME/.arduino15" -name boot_app0.bin | head -n1)" docs/boot_app0.bin
+          cp build/PhotoKeychain.ino.bin docs/PhotoKeychain.bin
+          printf "Built from %s
+" "$GITHUB_SHA" > docs/build.txt
+          ls -lh docs
 
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v4
         with:
-          name: waveshare-photo-display-firmware
-          path: pages-bundle/
+          name: waveshare-esp32-s3-photo-keychain
+          path: docs/
 
-      - name: Publish stable browser flasher to main/docs
-        if: github.ref == 'refs/heads/main'
+      - name: Publish stable browser installer
         run: |
           set -eux
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          rm -rf docs
-          mkdir -p docs
-          cp pages-bundle/index.html docs/index.html
-          cp pages-bundle/bootloader.bin docs/bootloader.bin
-          cp pages-bundle/partitions.bin docs/partitions.bin
-          cp pages-bundle/boot_app0.bin docs/boot_app0.bin
-          cp pages-bundle/PhotoKeychain.bin docs/PhotoKeychain.bin
-          cp pages-bundle/build.txt docs/build.txt
           git add docs/
           if git diff --cached --quiet; then
             echo "No docs changes"
             exit 0
           fi
-          git commit -m "Publish photo flasher [skip ci]"
-          git push origin HEAD:main
-
-      - name: Publish keychain experiment under main/docs/keychain
-        if: github.ref == 'refs/heads/experiment/photo-keychain'
-        run: |
-          set -eux
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          rm -rf /tmp/keychain-pages
-          mkdir -p /tmp/keychain-pages
-          cp pages-bundle/index.html /tmp/keychain-pages/index.html
-          cp pages-bundle/bootloader.bin /tmp/keychain-pages/bootloader.bin
-          cp pages-bundle/partitions.bin /tmp/keychain-pages/partitions.bin
-          cp pages-bundle/boot_app0.bin /tmp/keychain-pages/boot_app0.bin
-          cp pages-bundle/PhotoKeychain.bin /tmp/keychain-pages/PhotoKeychain.bin
-          cp pages-bundle/build.txt /tmp/keychain-pages/build.txt
-          git fetch origin main
-          git checkout -B pages-publish-main origin/main
-          rm -rf docs/keychain
-          mkdir -p docs/keychain
-          cp /tmp/keychain-pages/* docs/keychain/
-          git add docs/keychain/
-          if git diff --cached --quiet; then
-            echo "No keychain Pages changes"
-            exit 0
-          fi
-          git commit -m "Publish keychain experiment flasher [skip ci]"
+          git commit -m "Publish Photo Keychain installer [skip ci]"
           git push origin HEAD:main
