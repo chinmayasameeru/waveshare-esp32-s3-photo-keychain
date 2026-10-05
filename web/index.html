@@ -4,297 +4,80 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Waveshare Photo Display</title>
+<script src="https://unpkg.com/esptool-js/bundle.js"></script>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}
 body{margin:0;min-height:100vh;padding:24px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#080b12;color:#edf2f7}
-main{width:min(720px,100%);margin:auto;background:#151a23;border:1px solid #293342;border-radius:22px;padding:28px}
+main{width:min(700px,100%);margin:auto;background:#151a23;border:1px solid #293342;border-radius:22px;padding:28px}
 h1{margin:0 0 8px}.sub{color:#aab5c5;line-height:1.5}
 .box{margin-top:18px;padding:18px;border:1px solid #293342;border-radius:16px;background:#0e131b}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
-select,input[type=range]{width:100%}
-select,input[type=file]{padding:12px;border-radius:12px;border:1px solid #394456;background:#161c26;color:#fff}
+input[type=file]{width:100%;padding:12px;border-radius:12px;border:1px solid #394456;background:#161c26;color:#fff}
 button{width:100%;margin-top:14px;padding:15px;border:0;border-radius:13px;background:#f4f6f8;color:#111;font-size:17px;font-weight:700}
 button:disabled{opacity:.45}
-label{display:block;font-size:14px;color:#c3cddd;margin-bottom:7px}
-.previewWrap{margin:16px auto 0;width:min(100%,320px)}
-canvas{display:block;width:100%;height:auto;aspect-ratio:4/3;background:#000;border:1px solid #394456;border-radius:12px}
-.meta{display:flex;justify-content:space-between;gap:12px;margin-top:10px;font-size:13px;color:#9eabbf}
+#preview{display:none;width:100%;max-width:320px;aspect-ratio:4/3;object-fit:cover;border-radius:12px;margin:14px auto 0;border:1px solid #293342}
 #status{margin-top:16px;white-space:pre-wrap;color:#b9c4d5;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;line-height:1.5}
 .note{color:#8f9aae;font-size:13px;line-height:1.55}
-.badge{display:inline-block;padding:5px 9px;border-radius:999px;background:#222b38;color:#c5d1e0;font-size:12px;margin-right:6px}
-@media(max-width:520px){.row{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <main>
 <h1>Waveshare Photo Display</h1>
-<p class="sub">V1.1 · Prepare your image for the 320×240 LCD, preview it, then flash it together with the firmware. The ESP32 itself uses no Wi-Fi.</p>
-<div>
-  <span class="badge">ESP32-S3R8</span>
-  <span class="badge">16 MB Flash</span>
-  <span class="badge">8 MB PSRAM</span>
-  <span class="badge">240×320 ST7789T3</span>
-</div>
-
+<p class="sub">Select the image you want stored on the board. The browser converts it to a 320×240 JPEG and flashes it together with the firmware. The ESP32 itself uses no Wi-Fi.</p>
 <div class="box">
-  <label for="photo"><b>1. Choose an image</b></label>
-  <input id="photo" type="file" accept="image/*">
-
-  <div class="row">
-    <div>
-      <label for="fitMode">Image framing</label>
-      <select id="fitMode">
-        <option value="crop">Crop to fill 320×240</option>
-        <option value="fit">Fit entire image</option>
-      </select>
-    </div>
-    <div>
-      <label for="quality">JPEG quality: <span id="qualityValue">92</span>%</label>
-      <input id="quality" type="range" min="70" max="95" value="92" step="1">
-    </div>
-  </div>
-
-  <div class="previewWrap">
-    <canvas id="preview" width="320" height="240"></canvas>
-    <div class="meta">
-      <span id="sourceMeta">No image selected</span>
-      <span id="outputMeta">320×240</span>
-    </div>
-  </div>
-
-  <button id="flash" disabled>⚡ Flash Photo Display</button>
-  <div id="status">Choose an image to begin.</div>
+<label for="photo"><b>Choose an image</b></label>
+<input id="photo" type="file" accept="image/*">
+<img id="preview" alt="Preview">
+<button id="flash" disabled>⚡ Flash Photo Display</button>
+<div id="status">Choose an image to enable flashing.</div>
 </div>
-
 <div class="box">
-  <b>2. Connect by USB</b>
-  <p class="note">Use desktop Chrome or Edge over HTTPS with the ESP32-S3 connected by USB. After flashing, the board reboots and shows the prepared image automatically.</p>
-  <p class="note">The browser handles resizing/cropping and JPEG conversion before anything is written to the board.</p>
+<b>USB</b>
+<p class="note">Use desktop Chrome or Edge over HTTPS with the ESP32-S3 connected by USB. After flashing, unplug/replug the board; it will show the selected image automatically.</p>
 </div>
 </main>
-
-<script type="module">
-import { ESPLoader, Transport } from "https://unpkg.com/esptool-js@0.7.0/bundle.js";
-
-const PHOTO_ADDR = 0x310000;
-const PHOTO_MAGIC = 0x544F4850;
-const TARGET_W = 320;
-const TARGET_H = 240;
-
-const input = document.getElementById('photo');
-const fitMode = document.getElementById('fitMode');
-const quality = document.getElementById('quality');
-const qualityValue = document.getElementById('qualityValue');
-const preview = document.getElementById('preview');
-const ctx = preview.getContext('2d');
-const flashButton = document.getElementById('flash');
-const status = document.getElementById('status');
-const sourceMeta = document.getElementById('sourceMeta');
-const outputMeta = document.getElementById('outputMeta');
-
-let selectedFile = null;
-let decodedImage = null;
-let preparedJpeg = null;
-
-function log(msg){ status.textContent = msg; }
-
-function formatBytes(bytes) {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+<script>
+const PHOTO_ADDR=0x310000,PHOTO_MAGIC=0x544F4850,TARGET_W=320,TARGET_H=240;
+const input=document.getElementById('photo'),preview=document.getElementById('preview'),flashButton=document.getElementById('flash'),status=document.getElementById('status');
+function log(msg){status.textContent=msg}
+function loadImage(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file),img=new Image();img.onload=()=>{URL.revokeObjectURL(url);resolve(img)};img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Could not read image'))};img.src=url})}
+async function makeJpeg(file){
+ const img=await loadImage(file),canvas=document.createElement('canvas');canvas.width=TARGET_W;canvas.height=TARGET_H;
+ const ctx=canvas.getContext('2d'),scale=Math.max(TARGET_W/img.naturalWidth,TARGET_H/img.naturalHeight),w=img.naturalWidth*scale,h=img.naturalHeight*scale,x=(TARGET_W-w)/2,y=(TARGET_H-h)/2;
+ ctx.fillStyle='#000';ctx.fillRect(0,0,TARGET_W,TARGET_H);ctx.drawImage(img,x,y,w,h);
+ const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('JPEG conversion failed')),'image/jpeg',0.90));
+ return new Uint8Array(await blob.arrayBuffer());
 }
-
-function loadImage(file) {
-  return new Promise((resolve,reject)=>{
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = ()=>{
-      URL.revokeObjectURL(url);
-      resolve(img);
-    };
-    img.onerror = ()=>{
-      URL.revokeObjectURL(url);
-      reject(new Error('This browser cannot decode that image format.'));
-    };
-    img.src = url;
-  });
-}
-
-async function prepareJpeg(file) {
-  if (!decodedImage) decodedImage = await loadImage(file);
-
-  ctx.clearRect(0,0,TARGET_W,TARGET_H);
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0,0,TARGET_W,TARGET_H);
-
-  const iw = decodedImage.naturalWidth;
-  const ih = decodedImage.naturalHeight;
-
-  if (!iw || !ih) throw new Error('Image has invalid dimensions.');
-
-  if (fitMode.value === 'fit') {
-    const scale = Math.min(TARGET_W / iw, TARGET_H / ih);
-    const w = iw * scale;
-    const h = ih * scale;
-    const x = (TARGET_W - w) / 2;
-    const y = (TARGET_H - h) / 2;
-    ctx.drawImage(decodedImage, x, y, w, h);
-  } else {
-    const scale = Math.max(TARGET_W / iw, TARGET_H / ih);
-    const w = iw * scale;
-    const h = ih * scale;
-    const x = (TARGET_W - w) / 2;
-    const y = (TARGET_H - h) / 2;
-    ctx.drawImage(decodedImage, x, y, w, h);
-  }
-
-  const blob = await new Promise((resolve,reject)=>{
-    canvasToBlob(blobResult => {
-      if (blobResult) resolve(blobResult);
-      else reject(new Error('JPEG conversion failed.'));
-    });
-  });
-
-  preparedJpeg = new Uint8Array(await blob.arrayBuffer());
-  sourceMeta.textContent = iw + '×' + ih + ' · ' + formatBytes(file.size);
-  outputMeta.textContent = '320×240 · ' + formatBytes(preparedJpeg.length);
-  flashButton.disabled = false;
-  log('Image ready. Preview is exactly what will be flashed.');
-}
-
-function canvasToBlob(callback) {
-  preview.toBlob(callback, 'image/jpeg', Number(quality.value) / 100);
-}
-
-async function refreshPreparedImage() {
-  if (!selectedFile || !decodedImage) return;
-  flashButton.disabled = true;
-  try {
-    await prepareJpeg(selectedFile);
-  } catch (err) {
-    preparedJpeg = null;
-    log('Image preparation failed\\n' + (err.message || String(err)));
-  }
-}
-
-input.addEventListener('change', async()=>{
-  const file = input.files[0];
-  selectedFile = null;
-  decodedImage = null;
-  preparedJpeg = null;
-  flashButton.disabled = true;
-  preview.width = TARGET_W;
-  preview.height = TARGET_H;
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0,0,TARGET_W,TARGET_H);
-  sourceMeta.textContent = 'No image selected';
-  outputMeta.textContent = '320×240';
-
-  if (!file) {
-    log('Choose an image to begin.');
-    return;
-  }
-  if (!file.type.startsWith('image/')) {
-    log('Please choose an image file.');
-    return;
-  }
-
-  selectedFile = file;
-  log('Reading image...');
-
-  try {
-    decodedImage = await loadImage(file);
-    await prepareJpeg(file);
-  } catch(err) {
-    selectedFile = null;
-    decodedImage = null;
-    log('Image preparation failed\\n' + (err.message || String(err)));
-  }
+input.addEventListener('change',async()=>{
+ const file=input.files[0];preview.style.display='none';flashButton.disabled=true;
+ if(!file){log('Choose an image to enable flashing.');return}
+ if(!file.type.startsWith('image/')){log('Please choose an image file.');return}
+ const previewUrl=URL.createObjectURL(file);preview.src=previewUrl;preview.onload=()=>URL.revokeObjectURL(previewUrl);preview.style.display='block';
+ try{const jpeg=await makeJpeg(file);flashButton.disabled=false;log('Image ready. 320×240 JPEG size: '+jpeg.length+' bytes.')}
+ catch(err){log('Image conversion failed: '+(err.message||err))}
 });
-
-fitMode.addEventListener('change', refreshPreparedImage);
-quality.addEventListener('input', ()=>{
-  qualityValue.textContent = quality.value;
-});
-quality.addEventListener('change', refreshPreparedImage);
-
-async function flash() {
-  if (!selectedFile || !preparedJpeg) return;
-
-  flashButton.disabled = true;
-  let transport = null;
-
-  try {
-    if (!('serial' in navigator)) {
-      throw new Error('Web Serial is unavailable. Use desktop Chrome or Edge over HTTPS.');
-    }
-
-    log('Select the ESP32-S3 USB serial port...');
-    const port = await navigator.serial.requestPort();
-
-    const terminal = { clean(){}, writeLine(){}, write(){} };
-    transport = new Transport(port, true);
-    const loader = new ESPLoader({
-      transport,
-      baudrate: 115200,
-      terminal
-    });
-
-    log('Connecting to ESP32-S3...');
-    const chip = await loader.main();
-    log('Connected: ' + chip + '\\nDownloading firmware...');
-
-    const get = name => fetch(name, {cache:'no-store'}).then(r=>{
-      if (!r.ok) throw new Error(name + ' unavailable');
-      return r.arrayBuffer();
-    });
-
-    const [bootloader, partitions, bootApp0, app] = await Promise.all([
-      get('bootloader.bin'),
-      get('partitions.bin'),
-      get('boot_app0.bin'),
-      get('PhotoDisplay.bin')
-    ]);
-
-    const photoImage = new Uint8Array(8 + preparedJpeg.length);
-    const dv = new DataView(photoImage.buffer);
-    dv.setUint32(0, PHOTO_MAGIC, true);
-    dv.setUint32(4, preparedJpeg.length, true);
-    photoImage.set(preparedJpeg, 8);
-
-    log('Flashing firmware + prepared photo...');
-
-    await loader.writeFlash({
-      fileArray:[
-        {data:new Uint8Array(bootloader),address:0x0000},
-        {data:new Uint8Array(partitions),address:0x8000},
-        {data:new Uint8Array(bootApp0),address:0xE000},
-        {data:new Uint8Array(app),address:0x10000},
-        {data:photoImage,address:PHOTO_ADDR}
-      ],
-      flashMode:'dio',
-      flashFreq:'40m',
-      flashSize:'16MB',
-      eraseAll:true,
-      compress:true,
-      reportProgress(fileIndex,written,total){
-        const pct = total ? ((written/total)*100).toFixed(0) : '0';
-        log('Flashing part ' + (fileIndex+1) + '/5 — ' + pct + '%');
-      }
-    });
-
-    await loader.after('hard_reset');
-    log('DONE. Rebooting — your prepared photo should appear on the LCD.');
-  } catch(err) {
-    console.error(err);
-    log('FLASH FAILED\\n' + (err.message || String(err)));
-  } finally {
-    try { if (transport) await transport.disconnect(); } catch(_) {}
-    flashButton.disabled = !preparedJpeg;
-  }
+async function flash(){
+ const file=input.files[0];if(!file)return;flashButton.disabled=true;let transport=null;
+ try{
+  if(!('serial' in navigator))throw new Error('Web Serial is unavailable. Use desktop Chrome or Edge over HTTPS.');
+  const jpeg=await makeJpeg(file);log('Select the ESP32-S3 USB serial port...');const port=await navigator.serial.requestPort();
+  const terminal={clean(){},writeLine(){},write(){}};transport=new esptool.Transport(port,true);const loader=new esptool.ESPLoader({transport,baudrate:921600,terminal});
+  log('Connecting to ESP32-S3...');const chip=await loader.main();log('Connected: '+chip+'\nDownloading firmware...');
+  const get=name=>fetch(name,{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(name+' unavailable');return r.arrayBuffer()});
+  const [bootloader,partitions,bootApp0,app]=await Promise.all([get('bootloader.bin'),get('partitions.bin'),get('boot_app0.bin'),get('PhotoDisplay.bin')]);
+  const photoImage=new Uint8Array(8+jpeg.length),dv=new DataView(photoImage.buffer);dv.setUint32(0,PHOTO_MAGIC,true);dv.setUint32(4,jpeg.length,true);photoImage.set(jpeg,8);
+  log('Flashing firmware + selected image...');
+  await loader.writeFlash({
+   fileArray:[
+    {data:new Uint8Array(bootloader),address:0x0000},{data:new Uint8Array(partitions),address:0x8000},
+    {data:new Uint8Array(bootApp0),address:0xE000},{data:new Uint8Array(app),address:0x10000},{data:photoImage,address:PHOTO_ADDR}],
+   flashMode:'dio',flashFreq:'40m',flashSize:'16MB',eraseAll:true,compress:true,
+   reportProgress(fileIndex,written,total){const pct=total?((written/total)*100).toFixed(0):'0';log('Flashing part '+(fileIndex+1)+'/5 — '+pct+'%')}
+  });
+  await loader.after('hard_reset');log('DONE. Rebooting — your photo should appear on the LCD.');
+ }catch(err){console.error(err);log('FLASH FAILED\n'+(err.message||String(err)));}
+ finally{try{if(transport)await transport.disconnect()}catch(_){}flashButton.disabled=!input.files[0]}
 }
-
-flashButton.addEventListener('click', flash);
+flashButton.addEventListener('click',flash);
 </script>
 </body>
 </html>
