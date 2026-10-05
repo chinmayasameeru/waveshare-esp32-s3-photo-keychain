@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Photo Keychain — Firmware Flasher</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}
+body{margin:0;min-height:100vh;padding:24px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#080b12;color:#edf2f7}
+main{width:min(700px,100%);margin:auto;background:#151a23;border:1px solid #293342;border-radius:22px;padding:28px}
+h1{margin:0 0 8px}.sub{color:#aab5c5;line-height:1.5}
+.box{margin-top:18px;padding:18px;border:1px solid #293342;border-radius:16px;background:#0e131b}
+button{width:100%;margin-top:14px;padding:15px;border:0;border-radius:13px;background:#f4f6f8;color:#111;font-size:17px;font-weight:700;cursor:pointer}
+button:disabled{opacity:.45;cursor:default}
+#status{margin-top:16px;white-space:pre-wrap;color:#b9c4d5;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;line-height:1.5}
+.note{color:#8f9aae;font-size:13px;line-height:1.55}
+.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#fff}
+.ok{color:#8fe3a0}
+</style>
+</head>
+<body>
+<main>
+<h1>Photo Keychain</h1>
+<p class="sub">Flash the keychain firmware over USB. This page flashes <b>firmware only</b> — no photo is selected or stored during the USB step.</p>
+
+<div class="box">
+<b>Stage 1 firmware</b>
+<p class="note">After flashing, the LCD starts on the keychain setup screen. Wi-Fi stays OFF until you press the BOOT button.</p>
+<button id="flash">⚡ Flash Photo Keychain Firmware</button>
+<div id="status">Connect the ESP32-S3 by USB, then press the button above.</div>
+</div>
+
+<div class="box">
+<b>What happens after flashing</b>
+<p class="note">The LCD will show <span class="code">PHOTO KEYCHAIN / READY / Wi-Fi: OFF</span>. Press BOOT to start the <span class="code">PhotoKeychain</span> access point. iPhone photo selection will be added in the next experiment stage.</p>
+</div>
+</main>
+
+<script type="module">
+import { ESPLoader, Transport } from "https://unpkg.com/esptool-js@0.7.0/bundle.js";
+
+const button=document.getElementById('flash');
+const status=document.getElementById('status');
+
+function log(msg){status.textContent=msg}
+
+async function getBinary(name){
+  const response=await fetch(name,{cache:'no-store'});
+  if(!response.ok) throw new Error(name+' unavailable');
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+async function flash(){
+  button.disabled=true;
+  let transport=null;
+
+  try{
+    if(!('serial' in navigator)){
+      throw new Error('Web Serial is unavailable. Use desktop Chrome or Edge over HTTPS.');
+    }
+
+    log('Select the ESP32-S3 USB serial port...');
+    const port=await navigator.serial.requestPort();
+    const terminal={clean(){},writeLine(){},write(){}};
+    transport=new Transport(port,true);
+    const loader=new ESPLoader({transport,baudrate:115200,terminal});
+
+    log('Connecting to ESP32-S3...');
+    const chip=await loader.main();
+    log('Connected: '+chip+'\nDownloading firmware...');
+
+    const [bootloader,partitions,bootApp0,app]=await Promise.all([
+      getBinary('bootloader.bin'),
+      getBinary('partitions.bin'),
+      getBinary('boot_app0.bin'),
+      getBinary('PhotoDisplay.bin')
+    ]);
+
+    log('Flashing firmware only...');
+    await loader.writeFlash({
+      fileArray:[
+        {data:bootloader,address:0x0000},
+        {data:partitions,address:0x8000},
+        {data:bootApp0,address:0xE000},
+        {data:app,address:0x10000}
+      ],
+      flashMode:'dio',
+      flashFreq:'40m',
+      flashSize:'16MB',
+      eraseAll:true,
+      compress:true,
+      reportProgress(fileIndex,written,total){
+        const pct=total?((written/total)*100).toFixed(0):'0';
+        log('Flashing part '+(fileIndex+1)+'/4 — '+pct+'%');
+      }
+    });
+
+    await loader.after('hard_reset');
+    log('DONE.\n\nThe keychain should reboot to:\nPHOTO KEYCHAIN\nREADY\nWi-Fi: OFF\n\nPress BOOT for the Stage 1 Wi-Fi test.');
+  }catch(err){
+    console.error(err);
+    log('FLASH FAILED\n'+(err.message||String(err)));
+  }finally{
+    try{if(transport) await transport.disconnect()}catch(_){}
+    button.disabled=false;
+  }
+}
+
+button.addEventListener('click',flash);
+</script>
+</body>
+</html>
